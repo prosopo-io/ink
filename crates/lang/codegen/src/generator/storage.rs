@@ -96,6 +96,21 @@ impl Storage<'_> {
     /// Generates the storage struct definition.
     fn generate_storage_struct(&self) -> TokenStream2 {
         let storage = self.contract.module().storage();
+        if let syn::Fields::Unnamed(unnamed_fields) = storage.get_fields() {
+            if unnamed_fields.unnamed.len() == 1 {
+                let ty = &unnamed_fields.unnamed.first().unwrap().ty;
+                self.generate_storage_newtype_struct(ty)
+            } else {
+                self.generate_storage_normal_struct()
+            }
+        } else {
+            self.generate_storage_normal_struct()
+        }
+    }
+
+    /// Generates the storage struct definition.
+    fn generate_storage_normal_struct(&self) -> TokenStream2 {
+        let storage = self.contract.module().storage();
         let span = storage.span();
         let ident = &storage.ident();
         let attrs = &storage.attrs();
@@ -113,6 +128,26 @@ impl Storage<'_> {
             pub struct #ident {
                 #( #fields ),*
             }
+        )
+    }
+
+    /// Generates the storage struct definition.
+    fn generate_storage_newtype_struct(&self, ty: &syn::Type) -> TokenStream2 {
+        let storage = self.contract.module().storage();
+        let span = storage.span();
+        let ident = &storage.ident();
+        let attrs = &storage.attrs();
+        let cfg = self.generate_code_using::<generator::CrossCallingConflictCfg>();
+        quote_spanned!( span =>
+            #cfg
+            #(#attrs)*
+            #[cfg_attr(
+                feature = "std",
+                derive(::ink_storage::traits::StorageLayout)
+            )]
+            #[derive(::ink_storage::traits::SpreadLayout)]
+            #[cfg_attr(test, derive(Debug))]
+            pub struct #ident(#ty);
         )
     }
 }
