@@ -37,6 +37,7 @@ impl GenerateCode for Metadata<'_> {
         quote! {
             #[cfg(feature = "std")]
             #[cfg(not(feature = "ink-as-dependency"))]
+            #[cfg(not(feature = "ink-disable-dispatch"))]
             const _: () = {
                 #[no_mangle]
                 pub fn __ink_generate_metadata() -> ::ink_metadata::InkProject  {
