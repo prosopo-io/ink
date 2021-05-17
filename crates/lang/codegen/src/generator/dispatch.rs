@@ -70,6 +70,7 @@ impl GenerateCode for Dispatch<'_> {
             // since both resulting compilations do not require dispatching.
             #[cfg(not(test))]
             #no_cross_calling_cfg
+            #[cfg(not(feature = "ink-disable-dispatch"))]
             const _: () = {
                 #entry_points
                 #dispatch_using_mode
