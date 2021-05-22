@@ -233,12 +233,6 @@ impl TryFrom<syn::ItemImpl> for ItemImpl {
                 "unsafe ink! implementation blocks are not supported",
             ))
         }
-        if !item_impl.generics.params.is_empty() {
-            return Err(format_err_spanned!(
-                item_impl.generics.params,
-                "generic ink! implementation blocks are not supported",
-            ))
-        }
         let impl_items = item_impl
             .items
             .into_iter()
@@ -332,6 +326,11 @@ impl ItemImpl {
     /// Returns the `Self` type of the implementation block.
     pub fn self_type(&self) -> &syn::Type {
         self.self_ty.as_ref()
+    }
+
+    /// Returns the generics of the implementation block.
+    pub fn generics(&self) -> &syn::Generics {
+        &self.generics
     }
 
     /// Returns the trait type path if this is a trait implementation block.

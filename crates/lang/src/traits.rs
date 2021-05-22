@@ -26,11 +26,6 @@ use ink_env::{
 };
 use ink_storage::traits::SpreadLayout;
 
-/// Trait used to indicate that an ink! trait definition has been checked
-/// by the `#[ink::trait_definition]` proc. macro.
-#[doc(hidden)]
-pub unsafe trait CheckedInkTrait<T> {}
-
 /// Trait used by `#[ink::trait_definition]` to ensure that the associated
 /// return type for each trait message is correct.
 #[doc(hidden)]

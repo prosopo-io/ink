@@ -436,8 +436,12 @@ impl CrossCalling<'_> {
             }),
         );
         let checksum = u32::from_be_bytes([hash[0], hash[1], hash[2], hash[3]]) as usize;
+        let checksum_trait_ident = format_ident!(
+            "CheckedInkTrait{}",
+            checksum
+        );
         quote_spanned!(span =>
-            unsafe impl<'a> ::ink_lang::CheckedInkTrait<[(); #checksum]> for #forwarder_ident<&'a #mut_tok #storage_ident> {}
+            unsafe impl<'a> #checksum_trait_ident for #forwarder_ident<&'a #mut_tok #storage_ident> {}
 
             #( #attrs )*
             impl<'a> #trait_path for #forwarder_ident<&'a #mut_tok #storage_ident> {
@@ -731,9 +735,13 @@ impl CrossCalling<'_> {
             }),
         );
         let checksum = u32::from_be_bytes([hash[0], hash[1], hash[2], hash[3]]) as usize;
+        let checksum_trait_ident = format_ident!(
+            "CheckedInkTrait{}",
+            checksum
+        );
         quote_spanned!(span =>
             #cfg
-            unsafe impl ::ink_lang::CheckedInkTrait<[(); #checksum]> for #self_type {}
+            unsafe impl #checksum_trait_ident for #self_type {}
 
             #cfg
             #( #attrs )*

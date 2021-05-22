@@ -94,9 +94,15 @@ impl GenerateCode for TraitDefinition<'_> {
             .iter_items()
             .flat_map(ir::InkTraitItem::filter_map_message)
             .map(Self::generate_for_message);
+        let checksum_trait_ident = format_ident!(
+            "CheckedInkTrait{}",
+            verify_hash_id
+        );
         quote_spanned!(span =>
+            pub unsafe trait #checksum_trait_ident {}
+
             #(#attrs)*
-            pub trait #ident: ::ink_lang::CheckedInkTrait<[(); #verify_hash_id]> {
+            pub trait #ident: #checksum_trait_ident {
                 #[doc(hidden)]
                 #[allow(non_camel_case_types)]
                 type __ink_Checksum: #helper_ident;

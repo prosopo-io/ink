@@ -151,11 +151,72 @@ impl ItemImpls<'_> {
             }),
         );
         let checksum = u32::from_be_bytes([hash[0], hash[1], hash[2], hash[3]]) as usize;
+        let checksum_trait_ident = format_ident!(
+            "CheckedInkTrait{}",
+            checksum
+        );
         quote_spanned!(span =>
-            unsafe impl ::ink_lang::CheckedInkTrait<[(); #checksum]> for #self_type {}
+            unsafe impl #checksum_trait_ident for #self_type {}
 
             #( #attrs )*
             impl #trait_path for #self_type {
+                type __ink_Checksum = [(); #checksum];
+
+                #( #constructors )*
+                #( #messages )*
+                #( #other_items )*
+            }
+        )
+    }
+
+    fn generate_trait_item_generic_impl(item_impl: &ir::ItemImpl) -> TokenStream2 {
+        assert!(item_impl.trait_path().is_some());
+        let span = item_impl.span();
+        let attrs = item_impl.attrs();
+        let messages = item_impl
+            .iter_messages()
+            .map(|cws| Self::generate_trait_message(cws.callable()));
+        let constructors = item_impl
+            .iter_constructors()
+            .map(|cws| Self::generate_trait_constructor(cws.callable()));
+        let other_items = item_impl
+            .items()
+            .iter()
+            .filter_map(ir::ImplItem::filter_map_other_item)
+            .map(ToTokens::to_token_stream);
+        let trait_path = item_impl
+            .trait_path()
+            .expect("encountered missing trait path for trait impl block");
+        let self_type = item_impl.self_type();
+        let trait_ident = item_impl
+            .trait_ident()
+            .expect("encountered missing trait identifier for trait impl block");
+        let hash = ir::InkTrait::compute_verify_hash(
+            trait_ident,
+            item_impl.iter_constructors().map(|constructor| {
+                let ident = constructor.ident().clone();
+                let len_inputs = constructor.inputs().count();
+                (ident, len_inputs)
+            }),
+            item_impl.iter_messages().map(|message| {
+                let ident = message.ident().clone();
+                let len_inputs = message.inputs().count() + 1;
+                let is_mut = message.receiver().is_ref_mut();
+                (ident, len_inputs, is_mut)
+            }),
+        );
+
+        let checksum = u32::from_be_bytes([hash[0], hash[1], hash[2], hash[3]]) as usize;
+        let checksum_trait_ident = format_ident!(
+            "CheckedInkTrait{}",
+            checksum
+        );
+        let (impl_generics, _, where_clause) = item_impl.generics().split_for_impl();
+        quote_spanned!(span =>
+            unsafe impl #impl_generics #checksum_trait_ident for #self_type #where_clause {}
+
+            #( #attrs )*
+            impl #impl_generics #trait_path for #self_type #where_clause {
                 type __ink_Checksum = [(); #checksum];
 
                 #( #constructors )*
@@ -235,29 +296,17 @@ impl ItemImpls<'_> {
         )
     }
 
-    /// Generates code to guard against ink! implementations that have not been implemented
-    /// for the ink! storage struct.
-    fn generate_item_impl_self_ty_guard(&self, item_impl: &ir::ItemImpl) -> TokenStream2 {
-        let self_ty = item_impl.self_type();
-        let span = self_ty.span();
-        let storage_ident = self.contract.module().storage().ident();
-        quote_spanned!(span =>
-            ::ink_lang::static_assertions::assert_type_eq_all!(
-                #self_ty,
-                #storage_ident,
-            );
-        )
-    }
-
     /// Generates code for the given ink! implementation block.
     fn generate_item_impl(&self, item_impl: &ir::ItemImpl) -> TokenStream2 {
-        let self_ty_guard = self.generate_item_impl_self_ty_guard(item_impl);
         let impl_block = match item_impl.trait_path() {
-            Some(_) => Self::generate_trait_item_impl(item_impl),
+            Some(_) => if item_impl.generics().params.is_empty() {
+                Self::generate_trait_item_impl(item_impl)
+            } else {
+                Self::generate_trait_item_generic_impl(item_impl)
+            },
             None => Self::generate_inherent_item_impl(item_impl),
         };
         quote! {
-            #self_ty_guard
             #impl_block
         }
     }
