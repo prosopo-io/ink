@@ -135,7 +135,7 @@ impl Metadata<'_> {
             .map(|(trait_ident, constructor)| {
                 let span = constructor.span();
                 let attrs = constructor.attrs();
-                let docs = Self::extract_doc_comments(&attrs);
+                let docs = Self::extract_doc_comments(attrs);
                 let selector = constructor.composed_selector();
                 let selector_bytes = selector.as_bytes();
                 let constructor = constructor.callable();
@@ -221,7 +221,7 @@ impl Metadata<'_> {
             .map(|(trait_name, message)| {
                 let span = message.span();
                 let attrs = message.attrs();
-                let docs = Self::extract_doc_comments(&attrs);
+                let docs = Self::extract_doc_comments(attrs);
                 let selector = message.composed_selector();
                 let selector_bytes = selector.as_bytes();
                 let is_payable = message.is_payable();
@@ -367,7 +367,7 @@ mod tests {
                     /// line
                 ),
                 syn::parse_quote!(
-                    /// commments
+                    /// comments
                 ),
             ])
             .collect::<Vec<_>>(),
@@ -375,7 +375,7 @@ mod tests {
                 " multiple".to_string(),
                 " single".to_string(),
                 " line".to_string(),
-                " commments".to_string(),
+                " comments".to_string(),
             ],
         );
         assert_eq!(

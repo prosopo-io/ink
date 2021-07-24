@@ -34,7 +34,7 @@ mod erc20 {
     };
 
     /// The ERC-20 error types.
-    #[derive(Debug, PartialEq, Eq, scale::Encode)]
+    #[derive(Debug, PartialEq, Eq, scale::Encode, scale::Decode)]
     #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
     pub enum Error {
         /// Returned if not enough balance to fulfill a request is available.
@@ -206,7 +206,7 @@ mod erc20 {
         /// for the caller to withdraw from `from`.
         ///
         /// Returns `InsufficientBalance` error if there are not enough tokens on
-        /// the the account balance of `from`.
+        /// the account balance of `from`.
         #[ink(message)]
         fn transfer_from(
             &mut self,
