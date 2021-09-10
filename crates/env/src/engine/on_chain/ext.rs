@@ -711,14 +711,12 @@ impl_hash_fn!(blake2_256, 32);
 impl_hash_fn!(blake2_128, 16);
 
 pub fn ecdsa_recover(signature: &[u8; 65], message_hash: &[u8; 32], output: &mut [u8; 33]) -> Result {
-    let ret_code = {
-        unsafe {
-            sys::seal_ecdsa_recover(
-                Ptr32::from_slice(signature),
-                Ptr32::from_slice(message_hash),
-                Ptr32Mut::from_slice(output),
-            )
-        }
+    let ret_code = unsafe {
+        sys::seal_ecdsa_recover(
+            Ptr32::from_slice(signature),
+            Ptr32::from_slice(message_hash),
+            Ptr32Mut::from_slice(output),
+        )
     };
     ret_code.into()
 }
