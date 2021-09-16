@@ -248,9 +248,56 @@ fn namespace_works() {
         })
         .unwrap();
     assert_eq!(
-        impl_block.namespace,
-        Some(ir::Namespace::from(
+        impl_block.namespace(),
+        Some(&ir::Namespace::from(
             "my_namespace".to_string().as_bytes().to_vec()
         ))
     )
+}
+
+#[test]
+fn label_default_works() {
+    let impl_block: ir::ItemImpl =
+        <ir::ItemImpl as TryFrom<syn::ItemImpl>>::try_from(syn::parse_quote! {
+            impl Storage for MyStorage {
+                #[ink(message)]
+                fn my_message(&self) {}
+            }
+        })
+        .unwrap();
+    assert_eq!(
+        impl_block.trait_label(),
+        Some(String::from("Storage"))
+    )
+}
+
+#[test]
+fn label_works() {
+    let impl_block: ir::ItemImpl =
+        <ir::ItemImpl as TryFrom<syn::ItemImpl>>::try_from(syn::parse_quote! {
+            #[ink(label = "Storage2")]
+            impl Storage for MyStorage {
+                #[ink(message)]
+                fn my_message(&self) {}
+            }
+        })
+        .unwrap();
+    assert_eq!(
+        impl_block.trait_label(),
+        Some(String::from("Storage2"))
+    )
+}
+
+#[test]
+fn label_empty_works() {
+    let impl_block: ir::ItemImpl =
+        <ir::ItemImpl as TryFrom<syn::ItemImpl>>::try_from(syn::parse_quote! {
+            #[ink(label = "")]
+            impl Storage for MyStorage {
+                #[ink(message)]
+                fn my_message(&self) {}
+            }
+        })
+        .unwrap();
+    assert_eq!(impl_block.trait_label(), None)
 }

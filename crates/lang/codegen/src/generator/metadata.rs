@@ -124,33 +124,28 @@ impl Metadata<'_> {
             .module()
             .impls()
             .flat_map(|impl_block| {
-                let trait_ident = impl_block
-                    .trait_path()
-                    .map(|path| path.segments.last().map(|seg| &seg.ident))
-                    .flatten();
                 impl_block
                     .iter_constructors()
-                    .map(move |constructor| (trait_ident, constructor))
+                    .map(move |constructor| (impl_block.trait_label(), constructor))
             })
-            .map(|(trait_ident, constructor)| {
+            .map(|(trait_label, constructor)| {
                 let span = constructor.span();
                 let attrs = constructor.attrs();
                 let docs = Self::extract_doc_comments(attrs);
                 let selector = constructor.composed_selector();
                 let selector_bytes = selector.as_bytes();
                 let constructor = constructor.callable();
-                let ident = constructor.ident();
-                let ident_lit = ident.to_string();
+                let constructor_label = constructor.label();
                 let args = constructor
                     .inputs()
                     .map(|arg| Self::generate_message_param(arg));
-                let constr = match trait_ident {
-                    Some(trait_ident) => {
-                        let trait_ident_lit = trait_ident.to_string();
-                        quote_spanned!(span => from_trait_and_name(#trait_ident_lit, #ident_lit))
+                let constr = match trait_label {
+                    Some(trait_label) => {
+                        let label = [trait_label, constructor_label].join("::");
+                        quote_spanned!(span => from_label(#label))
                     }
                     None => {
-                        quote_spanned!(span => from_name(#ident_lit))
+                        quote_spanned!(span => from_label(#constructor_label))
                     }
                 };
                 quote_spanned!(span =>
@@ -215,15 +210,11 @@ impl Metadata<'_> {
             .module()
             .impls()
             .flat_map(|impl_block| {
-                let trait_ident = impl_block
-                    .trait_path()
-                    .map(|path| path.segments.last().map(|seg| &seg.ident))
-                    .flatten();
                 impl_block
                     .iter_messages()
-                    .map(move |message| (trait_ident, message))
+                    .map(move |message| (impl_block.trait_label(), message))
             })
-            .map(|(trait_ident, message)| {
+            .map(|(trait_label, message)| {
                 let span = message.span();
                 let attrs = message.attrs();
                 let docs = Self::extract_doc_comments(attrs);
@@ -232,19 +223,18 @@ impl Metadata<'_> {
                 let is_payable = message.is_payable();
                 let message = message.callable();
                 let mutates = message.receiver().is_ref_mut();
-                let ident = message.ident();
-                let ident_lit = ident.to_string();
+                let message_label = message.label();
                 let args = message
                     .inputs()
                     .map(|arg| Self::generate_message_param(arg));
                 let ret_ty = Self::generate_return_type(message.output());
-                let constr = match trait_ident {
-                    Some(trait_ident) => {
-                        let trait_ident_lit = trait_ident.to_string();
-                        quote_spanned!(span => from_trait_and_name(#trait_ident_lit, #ident_lit))
+                let constr = match trait_label {
+                    Some(trait_label) => {
+                        let label = [trait_label, message_label].join("::");
+                        quote_spanned!(span => from_label(#label))
                     }
                     None => {
-                        quote_spanned!(span => from_name(#ident_lit))
+                        quote_spanned!(span => from_label(#message_label))
                     }
                 };
                 quote_spanned!(span =>

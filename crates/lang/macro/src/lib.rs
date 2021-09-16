@@ -377,6 +377,46 @@ use proc_macro::TokenStream;
 ///     # }
 ///     ```
 ///
+///     **Controlling the naming of messages in ABI:**
+///
+///     Every ink! message, ink! constructor and ink! implementation section has a name which
+///     is used during generation of metadata(ABI).
+///
+///     An ink! smart contract author can control the labeling in ABI using the `label` flag. An example is shown below:
+///
+///     ```
+///     # use ink_lang as ink;
+///     # #[ink::contract]
+///     # mod flipper {
+///         # #[ink(storage)]
+///         # pub struct Flipper {
+///         #     value: bool,
+///         # }
+///
+///     #[ink(label = "MyFlipper")]
+///     impl Flipper {
+///         #[ink(constructor)]
+///         #[ink(label = "new_flipper")] // Works on constructors as well.
+///         pub fn new(initial_value: bool) -> Self {
+///             Flipper { value: false }
+///         }
+///
+///         # /// Flips the current value.
+///         # #[ink(message)]
+///         # #[ink(label = "my_flip")] // You can either specify name out-of-line.
+///         # pub fn flip(&mut self) {
+///         #     self.value = !self.value;
+///         # }
+///         #
+///         /// Returns the current value.
+///         #[ink(message, label = "get_value")] // ... or specify selector inline.
+///         pub fn get(&self) -> bool {
+///             self.value
+///         }
+///     }
+///     # }
+///     ```
+///
 /// ## Interacting with the Contract Executor
 ///
 /// The `ink_env` crate provides facilities to interact with the contract executor that
@@ -523,6 +563,8 @@ pub fn contract(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// this macro checks. Also ink! trait definitions are required to have specialized
 /// structure so that the main [`#[ink::contract]`](`macro@crate::contract`) macro can
 /// properly generate code for its implementations.
+///
+/// This definition allows only to use `#[ink(message)]` and `#[ink(constructor)]` ink! attributes.
 ///
 /// # Example: Definition
 ///

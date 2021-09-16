@@ -108,6 +108,14 @@ where
         <C as Callable>::ident(self.callable)
     }
 
+    fn label(&self) -> String {
+        <C as Callable>::label(self.callable)
+    }
+
+    fn user_provided_label(&self) -> Option<&String> {
+        <C as Callable>::user_provided_label(self.callable)
+    }
+
     fn user_provided_selector(&self) -> Option<&ir::Selector> {
         <C as Callable>::user_provided_selector(self.callable)
     }
@@ -151,6 +159,16 @@ pub trait Callable {
 
     /// Returns the identifier of the ink! callable.
     fn ident(&self) -> &Ident;
+
+    /// Returns the label of the message or the constructor.
+    ///
+    /// # Note
+    ///
+    /// If user specified the label, will return it, otherwise return default value.
+    fn label(&self) -> String;
+
+    /// Returns the label provided by the user.
+    fn user_provided_label(&self) -> Option<&String>;
 
     /// Returns the selector of the ink! callable if any has been manually set.
     fn user_provided_selector(&self) -> Option<&ir::Selector>;
