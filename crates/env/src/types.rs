@@ -154,13 +154,30 @@ pub type RentFraction = Perbill;
     Ord,
     PartialOrd,
     Hash,
-    Encode,
-    Decode,
     From,
     Default,
 )]
 #[cfg_attr(feature = "std", derive(TypeInfo))]
 pub struct AccountId([u8; 32]);
+
+impl scale::Encode for AccountId {
+    #[inline(always)]
+    fn size_hint(&self) -> usize {
+        32
+    }
+
+    #[inline]
+    fn encode_to<T: scale::Output + ?Sized>(&self, dest: &mut T) {
+        dest.write(&self.0[..])
+    }
+}
+
+impl scale::Decode for AccountId {
+    #[inline]
+    fn decode<I: scale::Input>(input: &mut I) -> Result<Self, scale::Error> {
+        Ok(<[u8; 32] as scale::Decode>::decode(input)?.into())
+    }
+}
 
 impl<'a> TryFrom<&'a [u8]> for AccountId {
     type Error = TryFromSliceError;

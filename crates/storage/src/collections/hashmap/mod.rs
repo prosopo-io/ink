@@ -17,6 +17,7 @@
 mod impls;
 mod iter;
 mod storage;
+mod simple_hash_map;
 
 #[cfg(test)]
 mod tests;
@@ -31,6 +32,7 @@ pub use self::iter::{
     Values,
     ValuesMut,
 };
+pub use self::simple_hash_map::SimpleHashMap;
 use crate::{
     collections::Stash,
     lazy::lazy_hmap::{

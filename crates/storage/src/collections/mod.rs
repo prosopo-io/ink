@@ -32,6 +32,7 @@ pub use self::{
     bitstash::BitStash,
     bitvec::Bitvec,
     hashmap::HashMap,
+    hashmap::SimpleHashMap,
     stash::Stash,
     vec::Vec,
 };

@@ -19,7 +19,7 @@ pub trait HashOutput: private::Sealed {
     /// The output type of the crypto hash.
     ///
     /// This should be a byte array with some constant size such as `[u8; 32]`.
-    type Type: Default;
+    type Type: Default + scale::Encode;
 }
 
 /// Types that are usable as built-in cryptographic hashes.
