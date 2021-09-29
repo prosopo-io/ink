@@ -134,6 +134,9 @@ impl<K, V, H> SimpleHashMap<K, V, H>
         if self.key.is_none() {
             return None
         }
+        // It hashes two times. But it is only to reduce the size of the code.
+        // It is temporary solution, because it can be implemented more elegant via ScopedBuffer.
+        // But it requires re-working of the API.
         let mut output = <H as HashOutput>::Type::default();
         ink_env::hash_encoded::<H, K>(key, &mut output);
         storage_key_common::<H>(&self.key.unwrap(), &output)
