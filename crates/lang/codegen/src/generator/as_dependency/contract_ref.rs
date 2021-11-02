@@ -47,13 +47,13 @@ pub struct ContractRef<'a> {
 impl GenerateCode for ContractRef<'_> {
     fn generate_code(&self) -> TokenStream2 {
         let contract_ref = self.generate_struct();
-        let contract_ref_trait_impls = self.generate_contract_trait_impls();
+        // let contract_ref_trait_impls = self.generate_contract_trait_impls();
         let contract_ref_inherent_impls = self.generate_contract_inherent_impls();
         let call_builder_trait_impl = self.generate_call_builder_trait_impl();
         let auxiliary_trait_impls = self.generate_auxiliary_trait_impls();
         quote! {
             #contract_ref
-            #contract_ref_trait_impls
+            // #contract_ref_trait_impls
             #contract_ref_inherent_impls
             #call_builder_trait_impl
             #auxiliary_trait_impls
@@ -114,6 +114,8 @@ impl ContractRef<'_> {
                 impl ::ink_lang::reflect::ContractEnv for #ref_ident {
                     type Env = <#storage_ident as ::ink_lang::reflect::ContractEnv>::Env;
                 }
+
+                impl ::ink_lang::reflect::InkStruct for #ref_ident {}
             };
         )
     }

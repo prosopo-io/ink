@@ -12,7 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::reflect::ContractEnv;
+use super::InkStruct;
+use crate::{
+    reflect::ContractEnv,
+    ToAccountId,
+};
 use core::marker::PhantomData;
 
 /// Type that is guaranteed by ink! to implement all ink! trait definitions.
@@ -55,9 +59,23 @@ pub struct TraitDefinitionRegistry<E> {
     marker: PhantomData<fn() -> E>,
 }
 
+// Inheritance of three traits below allows us to use default implementation of traits define via our macro
+
 impl<E> ContractEnv for TraitDefinitionRegistry<E>
 where
     E: ink_env::Environment,
 {
     type Env = E;
+}
+
+impl<E> InkStruct for TraitDefinitionRegistry<E> where E: ink_env::Environment {}
+
+impl<E> ToAccountId<E> for TraitDefinitionRegistry<E>
+where
+    E: ink_env::Environment,
+{
+    #[inline]
+    fn to_account_id(&self) -> E::AccountId {
+        unimplemented!()
+    }
 }

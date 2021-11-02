@@ -17,6 +17,7 @@ mod registry;
 
 pub use self::{
     info::{
+        InkStruct,
         TraitMessageInfo,
         TraitModulePath,
     },

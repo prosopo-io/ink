@@ -152,3 +152,6 @@ pub trait TraitModulePath {
     /// This is just for convenience.
     const NAME: &'static str;
 }
+
+/// Used to identify ink! structs.
+pub trait InkStruct {}

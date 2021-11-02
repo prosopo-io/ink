@@ -48,6 +48,7 @@ pub use self::{
     },
     event::ContractEventBase,
     trait_def::{
+        InkStruct,
         TraitDefinitionRegistry,
         TraitMessageInfo,
         TraitModulePath,

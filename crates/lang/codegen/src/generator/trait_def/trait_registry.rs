@@ -64,10 +64,8 @@ struct TraitRegistry<'a> {
 
 impl GenerateCode for TraitRegistry<'_> {
     fn generate_code(&self) -> TokenStream2 {
-        let registry_impl = self.generate_registry_impl();
         let trait_info = self.generate_trait_info_object();
         quote! {
-            #registry_impl
             #trait_info
         }
     }

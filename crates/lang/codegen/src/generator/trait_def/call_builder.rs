@@ -313,7 +313,10 @@ impl CallBuilder<'_> {
         let trait_ident = self.trait_def.trait_def.item().ident();
         let trait_info_ident = self.trait_def.trait_info_ident();
         let builder_ident = self.ident();
-        let message_impls = self.generate_ink_trait_impl_messages();
+        let message_call_builder_impls =
+            self.generate_ink_trait_impl_messages_call_builder();
+        let message_as_dependency_impls =
+            self.generate_ink_trait_impl_messages_as_dependency();
         quote_spanned!(span=>
             impl<E> ::ink_lang::reflect::ContractEnv for #builder_ident<E>
             where
@@ -330,17 +333,32 @@ impl CallBuilder<'_> {
                 #[allow(non_camel_case_types)]
                 type __ink_TraitInfo = #trait_info_ident<E>;
 
-                #message_impls
+                #message_call_builder_impls
+            }
+
+            impl<T> #trait_ident for T
+            where
+                T: ::ink_lang::reflect::ContractEnv
+                + ::ink_lang::ToAccountId<<T as ::ink_lang::reflect::ContractEnv>::Env>
+                + ::ink_lang::reflect::InkStruct,
+            {
+                #[doc(hidden)]
+                #[allow(non_camel_case_types)]
+                type __ink_TraitInfo = #trait_info_ident<<Self as ::ink_lang::reflect::ContractEnv>::Env>;
+
+                #message_as_dependency_impls
             }
         )
     }
 
     /// Generate the code for all ink! trait messages implemented by the trait call builder.
-    fn generate_ink_trait_impl_messages(&self) -> TokenStream2 {
+    fn generate_ink_trait_impl_messages_call_builder(&self) -> TokenStream2 {
         let messages = self.trait_def.trait_def.item().iter_items().filter_map(
             |(item, selector)| {
                 item.filter_map_message().map(|message| {
-                    self.generate_ink_trait_impl_for_message(&message, selector)
+                    self.generate_ink_trait_impl_for_message_call_builder(
+                        &message, selector,
+                    )
                 })
             },
         );
@@ -350,7 +368,7 @@ impl CallBuilder<'_> {
     }
 
     /// Generate the code for a single ink! trait message implemented by the trait call builder.
-    fn generate_ink_trait_impl_for_message(
+    fn generate_ink_trait_impl_for_message_call_builder(
         &self,
         message: &ir::InkTraitMessage,
         selector: ir::Selector,
@@ -397,6 +415,67 @@ impl CallBuilder<'_> {
                         )*
                     )
                     .returns::<#output_sig>()
+            }
+        )
+    }
+
+    /// Generate the code for all ink! trait messages implemented by the trait call builder.
+    fn generate_ink_trait_impl_messages_as_dependency(&self) -> TokenStream2 {
+        let messages = self.trait_def.trait_def.item().iter_items().filter_map(
+            |(item, selector)| {
+                item.filter_map_message().map(|message| {
+                    self.generate_ink_trait_impl_for_message_as_dependency(&message)
+                })
+            },
+        );
+        quote! {
+            #( #messages )*
+        }
+    }
+
+    /// Generate the code for a single ink! trait message implemented by the trait call forwarder.
+    fn generate_ink_trait_impl_for_message_as_dependency(
+        &self,
+        message: &ir::InkTraitMessage,
+    ) -> TokenStream2 {
+        let span = message.span();
+        let trait_ident = self.trait_def.trait_def.item().ident();
+        let forwarder_ident = self.ident();
+        let message_ident = message.ident();
+        let attrs = message.attrs();
+        let output_ident = generator::output_ident(message_ident);
+        let output_type = message
+            .output()
+            .cloned()
+            .unwrap_or_else(|| syn::parse_quote!(()));
+        let input_bindings = message.inputs().map(|input| &input.pat).collect::<Vec<_>>();
+        let input_types = message.inputs().map(|input| &input.ty).collect::<Vec<_>>();
+        let mut_tok = message.mutates().then(|| quote! { mut });
+        let panic_str = format!(
+            "encountered error while calling <{} as {}>::{}",
+            forwarder_ident, trait_ident, message_ident,
+        );
+        let builder_ident = self.trait_def.call_builder_ident();
+        let env_type = quote! { <Self as ::ink_lang::reflect::ContractEnv>::Env };
+        quote_spanned!(span =>
+            type #output_ident = #output_type;
+
+            #( #attrs )*
+            #[inline]
+            fn #message_ident(
+                & #mut_tok self
+                #( , #input_bindings : #input_types )*
+            ) -> Self::#output_ident {
+                <#builder_ident<#env_type> as #trait_ident>::#message_ident(
+                    & #mut_tok <#builder_ident<#env_type> as ::ink_env::call::FromAccountId<#env_type>>::from_account_id(
+                        <Self as ::ink_lang::ToAccountId<#env_type>>::to_account_id(self)
+                    )
+                    #(
+                        , #input_bindings
+                    )*
+                )
+                    .fire()
+                    .unwrap_or_else(|err| ::core::panic!("{}: {:?}", #panic_str, err))
             }
         )
     }

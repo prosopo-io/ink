@@ -46,13 +46,13 @@ impl GenerateCode for CallBuilder<'_> {
     fn generate_code(&self) -> TokenStream2 {
         let call_builder_struct = self.generate_struct();
         let auxiliary_trait_impls = self.generate_auxiliary_trait_impls();
-        let call_builder_impls = self.generate_call_forwarder_impls();
+        // let call_builder_impls = self.generate_call_forwarder_impls();
         let call_builder_inherent_impls = self.generate_call_builder_inherent_impls();
         quote! {
             const _: () = {
                 #call_builder_struct
                 #auxiliary_trait_impls
-                #call_builder_impls
+                // #call_builder_impls
                 #call_builder_inherent_impls
             };
         }
@@ -109,6 +109,8 @@ impl CallBuilder<'_> {
                 impl ::ink_lang::reflect::ContractEnv for #cb_ident {
                     type Env = <#storage_ident as ::ink_lang::reflect::ContractEnv>::Env;
                 }
+
+                impl ::ink_lang::reflect::InkStruct for #cb_ident {}
             };
         )
     }
