@@ -4,7 +4,10 @@ use ink_lang as ink;
 
 #[ink::contract]
 mod delegator {
-    use accumulator::AccumulatorRef;
+    use accumulator::{
+        AccumulatorRef,
+        AccumulatorTrait,
+    };
     use adder::AdderRef;
     use ink_storage::{
         traits::{
@@ -116,7 +119,7 @@ mod delegator {
         /// Returns the `accumulator` value.
         #[ink(message)]
         pub fn get(&self) -> i32 {
-            self.accumulator.get()
+            self.accumulator.value()
         }
 
         /// Delegates the call to either `Adder` or `Subber`.
