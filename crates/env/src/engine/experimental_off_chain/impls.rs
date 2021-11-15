@@ -218,6 +218,12 @@ impl EnvBackend for EnvInstance {
         unimplemented!("the experimental off chain env does not implement `seal_input`")
     }
 
+    fn input_scoped(&mut self, mut _buffer: &mut [u8]) {
+        unimplemented!(
+            "the experimental off chain env does not implement `seal_return_value`"
+        )
+    }
+
     fn return_value<R>(&mut self, _flags: ReturnFlags, _return_value: &R) -> !
     where
         R: scale::Encode,

@@ -166,6 +166,15 @@ impl EnvBackend for EnvInstance {
             })
     }
 
+    fn input_scoped(&mut self, buffer: &mut [u8]) {
+        let encoded = self
+            .exec_context()
+            .map(|exec_ctx| &exec_ctx.call_data)
+            .map(scale::Encode::encode)
+            .unwrap();
+        buffer.copy_from_slice(&encoded[..]);
+    }
+
     fn return_value<R>(&mut self, flags: ReturnFlags, return_value: &R) -> !
     where
         R: scale::Encode,

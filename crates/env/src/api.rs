@@ -537,6 +537,17 @@ pub fn return_value_scoped(return_flags: ReturnFlags, return_value: &[u8]) -> ! 
     })
 }
 
+/// Returns the buffer back to the caller of the executed contract.
+///
+/// # Note
+///
+/// This function  stops the execution of the contract immediately.
+pub fn input_scoped(buffer: &mut [u8]) {
+    <EnvInstance as OnInstance>::on_instance(|instance| {
+        EnvBackend::input_scoped(instance, buffer)
+    })
+}
+
 /// Returns a random hash seed and the block number since which it was determinable
 /// by chain observers.
 ///

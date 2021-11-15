@@ -207,6 +207,8 @@ pub trait EnvBackend {
     where
         T: scale::Decode;
 
+    fn input_scoped(&mut self, buffer: &mut [u8]);
+
     /// Returns the value back to the caller of the executed contract.
     ///
     /// # Note

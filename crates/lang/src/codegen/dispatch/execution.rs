@@ -89,14 +89,14 @@ pub fn execute_constructor<Contract, F, R>(
 ) -> Result<(), DispatchError>
 where
     Contract: SpreadLayout + ContractRootKey,
-    F: FnOnce() -> R,
+    F: FnOnce() -> Result<R, DispatchError>,
     <private::Seal<R> as ConstructorReturnType<Contract>>::ReturnValue: scale::Encode,
     private::Seal<R>: ConstructorReturnType<Contract>,
 {
     if config.dynamic_storage_alloc {
         alloc::initialize(ContractPhase::Deploy);
     }
-    let result = ManuallyDrop::new(private::Seal(f()));
+    let result = ManuallyDrop::new(private::Seal(f()?));
     match result.as_result() {
         Ok(contract) => {
             // Constructor is infallible or is fallible but succeeded.
