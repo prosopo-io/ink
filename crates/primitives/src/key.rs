@@ -174,13 +174,10 @@ impl scale::Encode for Key {
 impl scale::EncodeLike<[u8; 32]> for Key {}
 
 impl scale::Decode for Key {
-    #[inline]
-    fn decode<I>(input: &mut I) -> Result<Self, scale::Error>
-    where
-        I: scale::Input,
-    {
-        let bytes = <[u8; 32] as scale::Decode>::decode(input)?;
-        Ok(Self::from(bytes))
+    fn decode<I: scale::Input>(input: &mut I) -> Result<Self, scale::Error> {
+        let mut key = Key { 0: [0; 32] };
+        input.read(key.0.as_mut_slice())?;
+        Ok(key)
     }
 
     #[inline]

@@ -258,7 +258,7 @@ impl Dispatch<'_> {
                 let selector_bytes = constructor.composed_selector().hex_lits();
                 let input_bindings = constructor.inputs()
                     .map(|_| quote! {
-                        ::scale::Decode::decode(&mut _input).map_err(|_| ::ink_lang::reflect::DispatchError::CouldNotReadInput)?
+                        ::scale::Decode::decode(&mut _input).unwrap()
                     })
                     .collect::<Vec<_>>();
                 let input_tuple_type = generator::input_types_tuple(constructor.inputs());
@@ -309,7 +309,7 @@ impl Dispatch<'_> {
                     .unwrap_or_else(|| quote! { () });
                 let input_bindings = message.inputs()
                     .map(|_| quote! {
-                        ::scale::Decode::decode(&mut _input).map_err(|_| ::ink_lang::reflect::DispatchError::CouldNotReadInput)?
+                        ::scale::Decode::decode(&mut _input).unwrap()
                     })
                     .collect::<Vec<_>>();
                 let input_tuple_type = generator::input_types_tuple(message.inputs());
@@ -370,7 +370,7 @@ impl Dispatch<'_> {
                     .unwrap_or_else(|| quote! { () });
                 let input_bindings = message.inputs()
                     .map(|_| quote! {
-                        ::scale::Decode::decode(&mut _input).map_err(|_| ::ink_lang::reflect::DispatchError::CouldNotReadInput)?
+                        ::scale::Decode::decode(&mut _input).unwrap()
                     })
                     .collect::<Vec<_>>();
                 let input_tuple_type = generator::input_types_tuple(message.inputs());
@@ -491,8 +491,7 @@ impl Dispatch<'_> {
                         ::ink_env::input_scoped(&mut local_buffer[..]);
                         let mut input = &local_buffer[..];
 
-                        match <[::core::primitive::u8; 4usize] as ::scale::Decode>::decode(&mut input)
-                            .map_err(|_| ::ink_lang::reflect::DispatchError::InvalidSelector)?
+                        match <[::core::primitive::u8; 4usize] as ::scale::Decode>::decode(&mut input).unwrap()
                         {
                             #( #constructor_execute ),*
                             _invalid => return ::core::result::Result::Err(
@@ -619,8 +618,7 @@ impl Dispatch<'_> {
                             );
                         let mutates;
 
-                        match <[::core::primitive::u8; 4usize] as ::scale::Decode>::decode(&mut input)
-                            .map_err(|_| ::ink_lang::reflect::DispatchError::CouldNotReadInput)?
+                        match <[::core::primitive::u8; 4usize] as ::scale::Decode>::decode(&mut input).unwrap()
                         {
                             #( #message_execute ),*
                             _ => return ::core::result::Result::Err(
