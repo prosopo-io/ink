@@ -31,6 +31,7 @@ use crate::{
     Result,
 };
 use ink_primitives::Key;
+use static_assertions::_core::fmt::Debug;
 
 /// The flags to indicate further information about the end of a contract execution.
 #[derive(Default)]
@@ -400,7 +401,7 @@ pub trait TypedEnvBackend: EnvBackend {
     fn emit_event<T, Event>(&mut self, event: Event)
     where
         T: Environment,
-        Event: Topics + scale::Encode;
+        Event: Topics + scale::Encode + Debug;
 
     /// Sets the rent allowance of the executed contract to the new value.
     ///
