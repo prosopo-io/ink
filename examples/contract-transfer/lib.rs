@@ -12,21 +12,6 @@ pub mod give_me {
     #[ink(storage)]
     pub struct GiveMe {}
 
-    /// The error types.
-    #[derive(Debug, PartialEq, Eq, scale::Encode, scale::Decode)]
-    #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
-    pub enum Error {
-        /// Returned if the transfer failed.
-        TransferFailed,
-        /// Insufficient funds to execute transfer.
-        InsufficientFunds,
-        /// Transfer failed because it would have brought the contract's
-        /// balance below the subsistence threshold.
-        /// This is necessary to keep enough funds in the contract to
-        /// allow for a tombstone to be created.
-        BelowSubsistenceThreshold,
-    }
-
     impl GiveMe {
         /// Creates a new instance of this contract.
         #[ink(constructor)]
@@ -39,8 +24,9 @@ pub mod give_me {
         /// # Errors
         ///
         /// - Panics in case the requested transfer exceeds the contract balance.
-        /// - Panics in case the requested transfer would have brought the
-        ///   contract balance below the subsistence threshold.
+        /// - Panics in case the requested transfer would have brought this
+        ///   contract's balance below the minimum balance (i.e. the chain's
+        ///   existential deposit).
         /// - Panics in case the transfer failed for another reason.
         #[ink(message)]
         pub fn give_me(&mut self, value: Balance) {
@@ -49,15 +35,12 @@ pub mod give_me {
 
             assert!(value <= self.env().balance(), "insufficient funds!");
 
-            match self.env().transfer(self.env().caller(), value) {
-                Err(ink_env::Error::BelowSubsistenceThreshold) => {
-                    panic!(
-                        "requested transfer would have brought contract\
-                        below subsistence threshold!"
-                    )
-                }
-                Err(_) => panic!("transfer failed!"),
-                Ok(_) => {}
+            if self.env().transfer(self.env().caller(), value).is_err() {
+                panic!(
+                    "requested transfer failed. this can be the case if the contract does not\
+                     have sufficient free funds or if the transfer would have brought the\
+                     contract's balance below minimum balance."
+                )
             }
         }
 
@@ -73,12 +56,9 @@ pub mod give_me {
         pub fn was_it_ten(&self) {
             ink_env::debug_println!(
                 "received payment: {}",
-                self.env().transferred_balance()
+                self.env().transferred_value()
             );
-            assert!(
-                self.env().transferred_balance() == 10,
-                "payment was not ten"
-            );
+            assert!(self.env().transferred_value() == 10, "payment was not ten");
         }
     }
 
@@ -137,16 +117,16 @@ pub mod give_me {
                 0xCA, 0xFE, 0xBA, 0xBE,
             ]));
             data.push_arg(&accounts.eve);
-            let mock_transferred_balance = 10;
+            let mock_transferred_value = 10;
 
             // Push the new execution context which sets Eve as caller and
-            // the `mock_transferred_balance` as the value which the contract
+            // the `mock_transferred_value` as the value which the contract
             // will see as transferred to it.
             ink_env::test::push_execution_context::<ink_env::DefaultEnvironment>(
                 accounts.eve,
                 contract_id(),
                 1000000,
-                mock_transferred_balance,
+                mock_transferred_value,
                 data,
             );
 
@@ -168,16 +148,16 @@ pub mod give_me {
                 0xCA, 0xFE, 0xBA, 0xBE,
             ]));
             data.push_arg(&accounts.eve);
-            let mock_transferred_balance = 13;
+            let mock_transferred_value = 13;
 
             // Push the new execution context which sets Eve as caller and
-            // the `mock_transferred_balance` as the value which the contract
+            // the `mock_transferred_value` as the value which the contract
             // will see as transferred to it.
             ink_env::test::push_execution_context::<ink_env::DefaultEnvironment>(
                 accounts.eve,
                 contract_id(),
                 1000000,
-                mock_transferred_balance,
+                mock_transferred_value,
                 data,
             );
 
@@ -277,7 +257,7 @@ pub mod give_me {
 
             // when
             // Push the new execution context which sets Eve as caller and
-            // the `mock_transferred_balance` as the value which the contract
+            // the `mock_transferred_value` as the value which the contract
             // will see as transferred to it.
             set_sender(accounts.eve);
             ink_env::test::set_value_transferred::<ink_env::DefaultEnvironment>(10);
@@ -296,7 +276,7 @@ pub mod give_me {
 
             // when
             // Push the new execution context which sets Eve as caller and
-            // the `mock_transferred_balance` as the value which the contract
+            // the `mock_transferred_value` as the value which the contract
             // will see as transferred to it.
             set_sender(accounts.eve);
             ink_env::test::set_value_transferred::<ink_env::DefaultEnvironment>(13);

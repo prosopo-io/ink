@@ -41,7 +41,7 @@ More relevant links:
 * Talk to us on [Element][k2] or in [Discord][l2]
   on the [`ink_smart-contracts`](https://discord.com/channels/722223075629727774/765280480609828864) channel
 * [`cargo-contract`](https://github.com/paritytech/cargo-contract) ‒ CLI tool for ink! contracts
-* [Canvas UI](https://paritytech.github.io/canvas-ui/#/upload) ‒ Frontend for contract deployment and interaction
+* [Canvas UI](https://paritytech.github.io/canvas-ui/#/upload) ‒ Frontend for contract instantiation and interaction
 * [Substrate Contracts Node](https://github.com/paritytech/substrate-contracts-node) ‒ Simple Substrate blockchain which includes smart contract functionality
 
 
@@ -66,11 +66,14 @@ More relevant links:
 If you want to have a local setup you can use our [`substrate-contracts-node`](https://github.com/paritytech/substrate-contracts-node) for a quickstart.
 It's a simple Substrate blockchain which includes the Substrate module for smart contract functionality ‒ the `contracts` pallet (see [How it Works](#how-it-works) for more).
 
-The [Canvas UI](https://paritytech.github.io/canvas-ui/#/upload) can be used to deploy your contract to a chain and interact with it.
+We also have a live testnet on [Rococo](https://github.com/paritytech/cumulus/#rococo-crown)
+called [Canvas](https://github.com/paritytech/canvas/). Canvas is a Substrate based
+parachain which supports ink! smart contracts. For further instructions on using this
+testnet, follow the instructions in the
+[Canvas README](https://github.com/paritytech/canvas#rococo-deployment).
 
-We also have [a demonstration testnet](https://polkadot.js.org/apps/?rpc=wss%3A%2F%2Fcanvas-rpc.parity.io) running.
-You can request some tokens to play with from our [Faucet](https://riot.im/app/#/room/#canvas_faucet:matrix.parity.io) and deploy your contracts via the [Canvas UI](https://paritytech.github.io/canvas-ui/#/upload).
-
+For both types of chains the [Canvas UI](https://paritytech.github.io/canvas-ui/#/upload)
+can be used to instantiate your contract to a chain and interact with it.
 
 ## Usage
 
@@ -102,7 +105,7 @@ cargo +nightly contract build
 ```
 
 As a result you'll get a file `target/flipper.wasm` file, a `metadata.json` file and a `<contract-name>.contract` file in the `target` folder of your contract.
-The `.contract` file combines the Wasm and metadata into one file and needs to be used when deploying the contract.
+The `.contract` file combines the Wasm and metadata into one file and needs to be used when instantiating the contract.
 
 
 ## Hello, World! ‒ The Flipper
@@ -191,7 +194,7 @@ cargo contract build
 
 You should now have an `<name>.contract` file in the `target` folder of the contract.
 
-For information on how to deploy this to a chain, please have a look at the [Play with It](#play-with-it) section or our [smart contracts workshop](https://docs.substrate.io/tutorials/v3/ink-workshop/pt1).
+For information on how to upload this file to a chain, please have a look at the [Play with It](#play-with-it) section or our [smart contracts workshop](https://docs.substrate.io/tutorials/v3/ink-workshop/pt1).
 
 
 ## How it Works
@@ -221,6 +224,7 @@ In a module annotated with `#[ink::contract]` these attributes are available:
 | `#[ink(constructor)]` | Applicable to method. | Flags a method for the ink! storage struct as constructor making it available to the API for instantiating the contract. |
 | `#[ink(payable)]` | Applicable to ink! messages. | Allows receiving value as part of the call of the ink! message. ink! constructors are implicitly payable. |
 | `#[ink(selector = S:u32)]` | Applicable to ink! messages and ink! constructors. | Specifies a concrete dispatch selector for the flagged entity. This allows a contract author to precisely control the selectors of their APIs making it possible to rename their API without breakage. |
+| `#[ink(selector = _)]` | Applicable to ink! messages. | Specifies a fallback message that is invoked if no other ink! message matches a selector. |
 | `#[ink(namespace = N:string)]` | Applicable to ink! trait implementation blocks. | Changes the resulting selectors of all the ink! messages and ink! constructors within the trait implementation. Allows to disambiguate between trait implementations with overlapping message or constructor names. Use only with great care and consideration! |
 | `#[ink(impl)]` | Applicable to ink! implementation blocks. | Tells the ink! codegen that some implementation block shall be granted access to ink! internals even without it containing any ink! messages or ink! constructors. |
 

@@ -116,6 +116,10 @@ where
         <C as Callable>::is_payable(self.callable)
     }
 
+    fn has_wildcard_selector(&self) -> bool {
+        <C as Callable>::has_wildcard_selector(self.callable)
+    }
+
     fn visibility(&self) -> Visibility {
         <C as Callable>::visibility(self.callable)
     }
@@ -161,6 +165,9 @@ pub trait Callable {
     ///
     /// Flagging as payable is done using the `#[ink(payable)]` attribute.
     fn is_payable(&self) -> bool;
+
+    /// Returns `true` if the ink! callable is flagged as a wildcard selector.
+    fn has_wildcard_selector(&self) -> bool;
 
     /// Returns the visibility of the ink! callable.
     fn visibility(&self) -> Visibility;
@@ -214,7 +221,7 @@ pub trait Callable {
 /// }
 /// ```
 ///
-/// ... then the selector of `my_message` is simply `0xDEADBEEF` since it overrides
+/// …then the selector of `my_message` is simply `0xDEADBEEF` since it overrides
 /// the composed selector.
 ///
 /// ## Inherent implementation block
@@ -228,7 +235,7 @@ pub trait Callable {
 /// }
 /// ```
 ///
-/// ... then the selector of `my_message` is composed such as:
+/// …then the selector of `my_message` is composed such as:
 /// ```no_compile
 /// BLAKE2("my_message".to_string().as_bytes())[0..4]
 /// ```
@@ -244,7 +251,7 @@ pub trait Callable {
 /// }
 /// ```
 ///
-/// ... then the selector of `my_message` is composed such as:
+/// …then the selector of `my_message` is composed such as:
 /// ```no_compile
 /// BLAKE2("MyTrait::my_message".to_string().as_bytes())[0..4]
 /// ```
@@ -260,7 +267,7 @@ pub trait Callable {
 /// }
 /// ```
 ///
-/// ... then the selector of `my_message` is composed such as:
+/// …then the selector of `my_message` is composed such as:
 /// ```no_compile
 /// BLAKE2("::my_full::long_path::MyTrait::my_message".to_string().as_bytes())[0..4]
 /// ```
@@ -277,7 +284,7 @@ pub trait Callable {
 /// }
 /// ```
 ///
-/// ... then the selector of `my_message` is composed such as:
+/// …then the selector of `my_message` is composed such as:
 /// ```no_compile
 /// BLAKE2("my_namespace::MyTrait::my_message".to_string().as_bytes())[0..4]
 /// ```

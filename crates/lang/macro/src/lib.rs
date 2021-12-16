@@ -108,7 +108,7 @@ pub fn selector_bytes(input: TokenStream) -> TokenStream {
 /// - on-chain mode: `no_std` and WebAssembly as target
 /// - off-chain mode: `std`
 ///
-/// We generally use the on-chain mode for actual smart contract deployment
+/// We generally use the on-chain mode for actual smart contract instantiation
 /// whereas we use the off-chain mode for smart contract testing using the
 /// off-chain environment provided by the `ink_env` crate.
 ///
@@ -220,7 +220,6 @@ pub fn selector_bytes(input: TokenStream) -> TokenStream {
 ///         type Hash = [u8; 32];
 ///         type Timestamp = u64;
 ///         type BlockNumber = u32;
-///         type RentFraction = ::ink_env::Perbill;
 ///         type ChainExtension = ::ink_env::NoChainExtension;
 ///     }
 ///     ```
@@ -240,7 +239,6 @@ pub fn selector_bytes(input: TokenStream) -> TokenStream {
 ///         #     type Timestamp = u64;
 ///         #     type BlockNumber = u32;
 ///         #     type ChainExtension = ::ink_env::NoChainExtension;
-///         #     type RentFraction = ::ink_env::Perbill;
 ///         # }
 ///         #
 ///         # #[ink(storage)]
@@ -397,7 +395,7 @@ pub fn selector_bytes(input: TokenStream) -> TokenStream {
 ///         }
 ///
 ///         /// Returns the current value.
-///         #[ink(message, payable)] // ... or specify payable inline.
+///         #[ink(message, payable)] // ...or specify payable inline.
 ///         pub fn get(&self) -> bool {
 ///             self.value
 ///         }
@@ -437,7 +435,7 @@ pub fn selector_bytes(input: TokenStream) -> TokenStream {
 ///         # }
 ///         #
 ///         /// Returns the current value.
-///         #[ink(message, selector = 0xFEEDBEEF)] // ... or specify selector inline.
+///         #[ink(message, selector = 0xFEEDBEEF)] // ...or specify selector inline.
 ///         pub fn get(&self) -> bool {
 ///             self.value
 ///         }
@@ -483,7 +481,7 @@ pub fn selector_bytes(input: TokenStream) -> TokenStream {
 ///         #[ink(message, payable)]
 ///         pub fn fund(&self) {
 ///             let caller = self.env().caller();
-///             let value = self.env().transferred_balance();
+///             let value = self.env().transferred_value();
 ///             debug_println!("thanks for the funding of {:?} from {:?}", value, caller);
 ///         }
 ///     }
@@ -515,7 +513,7 @@ pub fn selector_bytes(input: TokenStream) -> TokenStream {
 ///     #[ink(storage)]
 ///     pub struct Erc20 {
 ///         total_supply: Balance,
-///         // more fields ...
+///         // more fields...
 ///     }
 ///
 ///     impl Erc20 {
@@ -609,7 +607,7 @@ pub fn contract(attr: TokenStream, item: TokenStream) -> TokenStream {
 ///     #[ink(message)]
 ///     fn transfer(&mut self, amount: Balance, to: AccountId) -> bool;
 ///
-///     // etc ...
+///     // etc.
 /// }
 /// ```
 ///
@@ -756,7 +754,7 @@ pub fn test(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// fn key_access_for_account(key: &[u8], account: &[u8]) -> Access;
 /// # }
 /// ```
-/// ... or as multiple stand alone ink! attributes applied to the same item:
+/// …or as multiple stand alone ink! attributes applied to the same item:
 /// ```
 /// # type Access = i32;
 /// # use ink_lang as ink;
@@ -827,7 +825,7 @@ pub fn test(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// pub trait MyChainExtension {
 ///     type ErrorCode = MyErrorCode;
 ///
-///     // more definitions ...
+///     // more definitions
 /// }
 /// ```
 ///
@@ -982,7 +980,6 @@ pub fn test(attr: TokenStream, item: TokenStream) -> TokenStream {
 ///     type Hash = <DefaultEnvironment as Environment>::Hash;
 ///     type BlockNumber = <DefaultEnvironment as Environment>::BlockNumber;
 ///     type Timestamp = <DefaultEnvironment as Environment>::Timestamp;
-///     type RentFraction = <DefaultEnvironment as Environment>::RentFraction;
 ///
 ///     type ChainExtension = RuntimeReadWrite;
 /// }
@@ -999,7 +996,8 @@ pub fn test(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// shown below.
 ///
 /// Note that chain extension methods are accessible through `Self::extension()` or
-/// `self.extension()`. For example as in `Self::extension().read(..)` or `self.extension().read(..)`.
+/// `self.extension()`. For example as in `Self::extension().read(...)` or
+/// `self.extension().read(...)`.
 ///
 /// ```
 /// # use ink_lang as ink;
@@ -1126,7 +1124,6 @@ pub fn test(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// #     type Hash = <ink_env::DefaultEnvironment as ink_env::Environment>::Hash;
 /// #     type BlockNumber = <ink_env::DefaultEnvironment as ink_env::Environment>::BlockNumber;
 /// #     type Timestamp = <ink_env::DefaultEnvironment as ink_env::Environment>::Timestamp;
-/// #     type RentFraction = <ink_env::DefaultEnvironment as ink_env::Environment>::RentFraction;
 /// #
 /// #     type ChainExtension = RuntimeReadWrite;
 /// # }

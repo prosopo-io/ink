@@ -35,8 +35,6 @@ use crate::{
     EnvBackend,
     Environment,
     Error,
-    RentParams,
-    RentStatus,
     Result,
     ReturnFlags,
     TypedEnvBackend,
@@ -107,13 +105,13 @@ impl From<ext::Error> for crate::Error {
             ext::Error::CalleeTrapped => Self::CalleeTrapped,
             ext::Error::CalleeReverted => Self::CalleeReverted,
             ext::Error::KeyNotFound => Self::KeyNotFound,
-            ext::Error::BelowSubsistenceThreshold => Self::BelowSubsistenceThreshold,
+            ext::Error::_BelowSubsistenceThreshold => Self::_BelowSubsistenceThreshold,
             ext::Error::TransferFailed => Self::TransferFailed,
-            ext::Error::NewContractNotFunded => Self::NewContractNotFunded,
+            ext::Error::_EndowmentTooLow => Self::_EndowmentTooLow,
             ext::Error::CodeNotFound => Self::CodeNotFound,
             ext::Error::NotCallable => Self::NotCallable,
             ext::Error::LoggingDisabled => Self::LoggingDisabled,
-            ext::Error::EcdsaRecoverFailed => Self::EcdsaRecoverFailed,
+            ext::Error::EcdsaRecoveryFailed => Self::EcdsaRecoveryFailed,
         }
     }
 }
@@ -259,11 +257,13 @@ impl EnvBackend for EnvInstance {
         message_hash: &[u8; 32],
         output: &mut [u8; 33],
     ) -> Result<()> {
-        use libsecp256k1::{
-            recover,
+        use secp256k1::{
+            recovery::{
+                RecoverableSignature,
+                RecoveryId,
+            },
             Message,
-            RecoveryId,
-            Signature,
+            Secp256k1,
         };
 
         // In most implementations, the v is just 0 or 1 internally, but 27 was added
@@ -273,20 +273,25 @@ impl EnvBackend for EnvInstance {
         } else {
             signature[64]
         };
-        let message = Message::parse(message_hash);
-        let signature = Signature::parse_standard_slice(&signature[0..64])
-            .unwrap_or_else(|error| panic!("Unable to parse the signature: {}", error));
-
-        let recovery_id = RecoveryId::parse(recovery_byte)
+        let recovery_id = RecoveryId::from_i32(recovery_byte as i32)
             .unwrap_or_else(|error| panic!("Unable to parse the recovery id: {}", error));
+        let message = Message::from_slice(message_hash).unwrap_or_else(|error| {
+            panic!("Unable to create the message from hash: {}", error)
+        });
+        let signature =
+            RecoverableSignature::from_compact(&signature[0..64], recovery_id)
+                .unwrap_or_else(|error| {
+                    panic!("Unable to parse the signature: {}", error)
+                });
 
-        let pub_key = recover(&message, &signature, &recovery_id);
+        let secp = Secp256k1::new();
+        let pub_key = secp.recover(&message, &signature);
         match pub_key {
             Ok(pub_key) => {
-                *output = pub_key.serialize_compressed();
+                *output = pub_key.serialize();
                 Ok(())
             }
-            Err(_) => Err(Error::EcdsaRecoverFailed),
+            Err(_) => Err(Error::EcdsaRecoveryFailed),
         }
     }
 
@@ -325,7 +330,7 @@ impl TypedEnvBackend for EnvInstance {
             })
     }
 
-    fn transferred_balance<T: Environment>(&mut self) -> T::Balance {
+    fn transferred_value<T: Environment>(&mut self) -> T::Balance {
         self.get_property::<T::Balance>(Engine::value_transferred)
             .unwrap_or_else(|error| {
                 panic!("could not read `transferred_value` property: {:?}", error)
@@ -360,30 +365,6 @@ impl TypedEnvBackend for EnvInstance {
             })
     }
 
-    fn rent_allowance<T: Environment>(&mut self) -> T::Balance {
-        self.get_property::<T::Balance>(Engine::rent_allowance)
-            .unwrap_or_else(|error| {
-                panic!("could not read `rent_allowance` property: {:?}", error)
-            })
-    }
-
-    fn rent_params<T>(&mut self) -> Result<RentParams<T>>
-    where
-        T: Environment,
-    {
-        unimplemented!("off-chain environment does not support rent params")
-    }
-
-    fn rent_status<T>(
-        &mut self,
-        _at_refcount: Option<core::num::NonZeroU32>,
-    ) -> Result<RentStatus<T>>
-    where
-        T: Environment,
-    {
-        unimplemented!("off-chain environment does not support rent status")
-    }
-
     fn block_number<T: Environment>(&mut self) -> T::BlockNumber {
         self.get_property::<T::BlockNumber>(Engine::block_number)
             .unwrap_or_else(|error| {
@@ -398,13 +379,6 @@ impl TypedEnvBackend for EnvInstance {
             })
     }
 
-    fn tombstone_deposit<T: Environment>(&mut self) -> T::Balance {
-        self.get_property::<T::Balance>(Engine::tombstone_deposit)
-            .unwrap_or_else(|error| {
-                panic!("could not read `tombstone_deposit` property: {:?}", error)
-            })
-    }
-
     fn emit_event<T, Event>(&mut self, event: Event)
     where
         T: Environment,
@@ -414,14 +388,6 @@ impl TypedEnvBackend for EnvInstance {
         let enc_topics = event.topics::<T, _>(builder.into());
         let enc_data = &scale::Encode::encode(&event)[..];
         self.engine.deposit_event(&enc_topics[..], enc_data);
-    }
-
-    fn set_rent_allowance<T>(&mut self, new_value: T::Balance)
-    where
-        T: Environment,
-    {
-        let buffer = &scale::Encode::encode(&new_value)[..];
-        self.engine.set_rent_allowance(buffer)
     }
 
     fn invoke_contract<T, Args>(&mut self, params: &CallParams<T, Args, ()>) -> Result<()>
@@ -464,29 +430,6 @@ impl TypedEnvBackend for EnvInstance {
         let _input = params.exec_input();
         let _salt_bytes = params.salt_bytes();
         unimplemented!("off-chain environment does not support contract instantiation")
-    }
-
-    fn restore_contract<T>(
-        &mut self,
-        account_id: T::AccountId,
-        code_hash: T::Hash,
-        rent_allowance: T::Balance,
-        filtered_keys: &[Key],
-    ) where
-        T: Environment,
-    {
-        let enc_account_id = &scale::Encode::encode(&account_id)[..];
-        let enc_code_hash = &scale::Encode::encode(&code_hash)[..];
-        let enc_rent_allowance = &scale::Encode::encode(&rent_allowance)[..];
-
-        let filtered: Vec<&[u8]> =
-            filtered_keys.iter().map(|k| &k.as_ref()[..]).collect();
-        self.engine.restore_to(
-            enc_account_id,
-            enc_code_hash,
-            enc_rent_allowance,
-            &filtered[..],
-        );
     }
 
     fn terminate_contract<T>(&mut self, beneficiary: T::AccountId) -> !

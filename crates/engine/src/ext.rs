@@ -24,10 +24,7 @@ use crate::{
         DebugInfo,
         EmittedEvent,
     },
-    types::{
-        AccountId,
-        Key,
-    },
+    types::AccountId,
 };
 use std::panic::panic_any;
 
@@ -78,24 +75,22 @@ define_error_codes! {
     CalleeReverted = 2,
     /// The passed key does not exist in storage.
     KeyNotFound = 3,
-    /// Transfer failed because it would have brought the sender's total balance
-    /// below the subsistence threshold.
-    BelowSubsistenceThreshold = 4,
+    /// Deprecated and no longer returned: There is only the minimum balance.
+    _BelowSubsistenceThreshold = 4,
     /// Transfer failed for other not further specified reason. Most probably
     /// reserved or locked balance of the sender that was preventing the transfer.
     TransferFailed = 5,
-    /// The newly created contract is below the subsistence threshold after executing
-    /// its constructor so no usable contract instance will be created.
-    NewContractNotFunded = 6,
+    /// Deprecated and no longer returned: Endowment is no longer required.
+    _EndowmentTooLow = 6,
     /// No code could be found at the supplied code hash.
     CodeNotFound = 7,
-    /// The account that was called is either no contract (e.g. user account) or is a tombstone.
+    /// The account that was called is no contract.
     NotCallable = 8,
     /// The call to `seal_debug_message` had no effect because debug message
     /// recording was disabled.
     LoggingDisabled = 9,
-    /// ECDSA pubkey recovery failed. Most probably wrong recovery id or signature.
-    EcdsaRecoverFailed = 11,
+    /// ECDSA public key recovery failed. Most probably wrong recovery id or signature.
+    EcdsaRecoveryFailed = 11,
 }
 
 /// The raw return code returned by the host side.
@@ -244,9 +239,6 @@ impl Engine {
         self.transfer(beneficiary, value)
             .expect("transfer did not work");
 
-        // What is currently missing is to set a tombstone with a code hash here
-        // and remove the contract storage subsequently.
-
         // Encode the result of the termination and panic with it.
         // This enables testing for the proper result and makes sure this
         // method returns `Never`.
@@ -299,29 +291,6 @@ impl Engine {
         set_output(output, callee)
     }
 
-    /// Restores a tombstone to the original smart contract.
-    ///
-    /// # Params
-    ///
-    /// - `account_id`: Encoded bytes of the `AccountId` of the to-be-restored contract.
-    /// - `code_hash`: Encoded code hash of the to-be-restored contract.
-    /// - `rent_allowance`: The encoded rent allowance of the restored contract
-    ///                     upon successful restoration.
-    /// - `filtered_keys`: Storage keys that will be ignored for the tombstone hash
-    ///                    match calculation that decide whether the original contract
-    ///                    storage and the storage of the restorer contract is equal.
-    pub fn restore_to(
-        &mut self,
-        _account_id: &[u8],
-        _code_hash: &[u8],
-        _rent_allowance: &[u8],
-        filtered_keys: &[&[u8]],
-    ) {
-        let _filtered_keys: Vec<crate::Key> =
-            filtered_keys.iter().map(|k| Key::from_bytes(k)).collect();
-        unimplemented!("off-chain environment does not yet support `restore_to`");
-    }
-
     /// Records the given debug message and appends to stdout.
     pub fn debug_message(&mut self, message: &str) {
         self.debug_info.record_debug_message(String::from(message));
@@ -360,16 +329,8 @@ impl Engine {
         unimplemented!("off-chain environment does not yet support `gas_left`");
     }
 
-    pub fn rent_allowance(&self, _output: &mut &mut [u8]) {
-        unimplemented!("off-chain environment does not yet support `rent_allowance`");
-    }
-
     pub fn minimum_balance(&self, _output: &mut &mut [u8]) {
         unimplemented!("off-chain environment does not yet support `minimum_balance`");
-    }
-
-    pub fn tombstone_deposit(&self, _output: &mut &mut [u8]) {
-        unimplemented!("off-chain environment does not yet support `tombstone_deposit`");
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -401,10 +362,6 @@ impl Engine {
         unimplemented!("off-chain environment does not yet support `weight_to_fee`");
     }
 
-    pub fn set_rent_allowance(&mut self, _value: &[u8]) {
-        unimplemented!("off-chain environment does not yet support `set_rent_allowance`");
-    }
-
     pub fn random(&self, _subject: &[u8], _output: &mut &mut [u8]) {
         unimplemented!("off-chain environment does not yet support `random`");
     }
@@ -428,11 +385,13 @@ impl Engine {
         message_hash: &[u8; 32],
         output: &mut [u8; 33],
     ) -> Result {
-        use libsecp256k1::{
-            recover,
+        use secp256k1::{
+            recovery::{
+                RecoverableSignature,
+                RecoveryId,
+            },
             Message,
-            RecoveryId,
-            Signature,
+            Secp256k1,
         };
 
         // In most implementations, the v is just 0 or 1 internally, but 27 was added
@@ -442,20 +401,27 @@ impl Engine {
         } else {
             signature[64]
         };
-        let message = Message::parse(message_hash);
-        let signature = Signature::parse_standard_slice(&signature[0..64])
-            .unwrap_or_else(|error| panic!("Unable to parse the signature: {}", error));
 
-        let recovery_id = RecoveryId::parse(recovery_byte)
+        let recovery_id = RecoveryId::from_i32(recovery_byte as i32)
             .unwrap_or_else(|error| panic!("Unable to parse the recovery id: {}", error));
 
-        let pub_key = recover(&message, &signature, &recovery_id);
+        let message = Message::from_slice(message_hash).unwrap_or_else(|error| {
+            panic!("Unable to create the message from hash: {}", error)
+        });
+        let signature =
+            RecoverableSignature::from_compact(&signature[0..64], recovery_id)
+                .unwrap_or_else(|error| {
+                    panic!("Unable to parse the signature: {}", error)
+                });
+
+        let secp = Secp256k1::new();
+        let pub_key = secp.recover(&message, &signature);
         match pub_key {
             Ok(pub_key) => {
-                *output = pub_key.serialize_compressed();
+                *output = pub_key.serialize();
                 Ok(())
             }
-            Err(_) => Err(Error::EcdsaRecoverFailed),
+            Err(_) => Err(Error::EcdsaRecoveryFailed),
         }
     }
 }

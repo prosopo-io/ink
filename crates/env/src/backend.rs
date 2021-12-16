@@ -23,10 +23,6 @@ use crate::{
         HashOutput,
     },
     topics::Topics,
-    types::{
-        RentParams,
-        RentStatus,
-    },
     Environment,
     Result,
 };
@@ -306,12 +302,12 @@ pub trait TypedEnvBackend: EnvBackend {
     /// For more details visit: [`caller`][`crate::caller`]
     fn caller<T: Environment>(&mut self) -> T::AccountId;
 
-    /// Returns the transferred balance for the contract execution.
+    /// Returns the transferred value for the contract execution.
     ///
     /// # Note
     ///
-    /// For more details visit: [`transferred_balance`][`crate::transferred_balance`]
-    fn transferred_balance<T: Environment>(&mut self) -> T::Balance;
+    /// For more details visit: [`transferred_value`][`crate::transferred_value`]
+    fn transferred_value<T: Environment>(&mut self) -> T::Balance;
 
     /// Returns the price for the specified amount of gas.
     ///
@@ -348,30 +344,6 @@ pub trait TypedEnvBackend: EnvBackend {
     /// For more details visit: [`balance`][`crate::balance`]
     fn balance<T: Environment>(&mut self) -> T::Balance;
 
-    /// Returns the current rent allowance for the executed contract.
-    ///
-    /// # Note
-    ///
-    /// For more details visit: [`rent_allowance`][`crate::rent_allowance`]
-    fn rent_allowance<T: Environment>(&mut self) -> T::Balance;
-
-    /// Returns information needed for rent calculations.
-    ///
-    /// # Note
-    ///
-    /// For more details visit: [`RentParams`][`crate::RentParams`]
-    fn rent_params<T: Environment>(&mut self) -> Result<RentParams<T>>;
-
-    /// Returns information about the required deposit and resulting rent.
-    ///
-    /// # Note
-    ///
-    /// For more details visit: [`RentStatus`][`crate::RentStatus`]
-    fn rent_status<T: Environment>(
-        &mut self,
-        at_refcount: Option<core::num::NonZeroU32>,
-    ) -> Result<RentStatus<T>>;
-
     /// Returns the current block number.
     ///
     /// # Note
@@ -379,19 +351,13 @@ pub trait TypedEnvBackend: EnvBackend {
     /// For more details visit: [`block_number`][`crate::block_number`]
     fn block_number<T: Environment>(&mut self) -> T::BlockNumber;
 
-    /// Returns the minimum balance that is required for creating an account.
+    /// Returns the minimum balance that is required for creating an account
+    /// (i.e. the chain's existential deposit).
     ///
     /// # Note
     ///
     /// For more details visit: [`minimum_balance`][`crate::minimum_balance`]
     fn minimum_balance<T: Environment>(&mut self) -> T::Balance;
-
-    /// Returns the tombstone deposit of the contract chain.
-    ///
-    /// # Note
-    ///
-    /// For more details visit: [`tombstone_deposit`][`crate::tombstone_deposit`]
-    fn tombstone_deposit<T: Environment>(&mut self) -> T::Balance;
 
     /// Emits an event with the given event data.
     ///
@@ -402,15 +368,6 @@ pub trait TypedEnvBackend: EnvBackend {
     where
         T: Environment,
         Event: Topics + scale::Encode + Debug;
-
-    /// Sets the rent allowance of the executed contract to the new value.
-    ///
-    /// # Note
-    ///
-    /// For more details visit: [`set_rent_allowance`][`crate::set_rent_allowance`]
-    fn set_rent_allowance<T>(&mut self, new_value: T::Balance)
-    where
-        T: Environment;
 
     /// Invokes a contract message.
     ///
@@ -452,20 +409,6 @@ pub trait TypedEnvBackend: EnvBackend {
         T: Environment,
         Args: scale::Encode,
         Salt: AsRef<[u8]>;
-
-    /// Restores a smart contract tombstone.
-    ///
-    /// # Note
-    ///
-    /// For more details visit: [`restore_contract`][`crate::restore_contract`]
-    fn restore_contract<T>(
-        &mut self,
-        account_id: T::AccountId,
-        code_hash: T::Hash,
-        rent_allowance: T::Balance,
-        filtered_keys: &[Key],
-    ) where
-        T: Environment;
 
     /// Terminates a smart contract.
     ///

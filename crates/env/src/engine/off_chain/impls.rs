@@ -32,10 +32,6 @@ use crate::{
         Sha2x256,
     },
     topics::Topics,
-    types::{
-        RentParams,
-        RentStatus,
-    },
     EnvBackend,
     Environment,
     Error,
@@ -208,11 +204,13 @@ impl EnvBackend for EnvInstance {
         message_hash: &[u8; 32],
         output: &mut [u8; 33],
     ) -> Result<()> {
-        use libsecp256k1::{
-            recover,
+        use secp256k1::{
+            recovery::{
+                RecoverableSignature,
+                RecoveryId,
+            },
             Message,
-            RecoveryId,
-            Signature,
+            Secp256k1,
         };
 
         // In most implementations, the v is just 0 or 1 internally, but 27 was added
@@ -222,20 +220,25 @@ impl EnvBackend for EnvInstance {
         } else {
             signature[64]
         };
-        let message = Message::parse(message_hash);
-        let signature = Signature::parse_standard_slice(&signature[0..64])
-            .unwrap_or_else(|error| panic!("Unable to parse the signature: {}", error));
-
-        let recovery_id = RecoveryId::parse(recovery_byte)
+        let recovery_id = RecoveryId::from_i32(recovery_byte as i32)
             .unwrap_or_else(|error| panic!("Unable to parse the recovery id: {}", error));
+        let message = Message::from_slice(message_hash).unwrap_or_else(|error| {
+            panic!("Unable to create the message from hash: {}", error)
+        });
+        let signature =
+            RecoverableSignature::from_compact(&signature[0..64], recovery_id)
+                .unwrap_or_else(|error| {
+                    panic!("Unable to parse the signature: {}", error)
+                });
 
-        let pub_key = recover(&message, &signature, &recovery_id);
+        let secp = Secp256k1::new();
+        let pub_key = secp.recover(&message, &signature);
         match pub_key {
             Ok(pub_key) => {
-                *output = pub_key.serialize_compressed();
+                *output = pub_key.serialize();
                 Ok(())
             }
-            Err(_) => Err(Error::EcdsaRecoverFailed),
+            Err(_) => Err(Error::EcdsaRecoveryFailed),
         }
     }
 
@@ -315,10 +318,6 @@ impl EnvInstance {
         let contract_id = self.account_id::<T>();
         self.accounts.remove_account::<T>(contract_id);
 
-        // The on-chain implementation would set a tombstone with a code hash here
-        // and remove the contract storage subsequently. Both is not easily achievable
-        // with our current off-chain env, hence we left it out here for the moment.
-
         // Encode the result of the termination and panic with it.
         // This enables testing for the proper result and makes sure this
         // method returns `Never`.
@@ -340,12 +339,12 @@ impl TypedEnvBackend for EnvInstance {
             })
     }
 
-    fn transferred_balance<T: Environment>(&mut self) -> T::Balance {
+    fn transferred_value<T: Environment>(&mut self) -> T::Balance {
         self.exec_context()
             .expect(UNINITIALIZED_EXEC_CONTEXT)
             .transferred_value::<T>()
             .unwrap_or_else(|error| {
-                panic!("could not read `transferred_balance` property: {:?}", error)
+                panic!("could not read `transferred_value` property: {:?}", error)
             })
     }
 
@@ -391,64 +390,6 @@ impl TypedEnvBackend for EnvInstance {
             })
     }
 
-    fn rent_allowance<T: Environment>(&mut self) -> T::Balance {
-        self.callee_account()
-            .rent_allowance::<T>()
-            .unwrap_or_else(|error| {
-                panic!("could not read `rent_allowance` property: {:?}", error)
-            })
-    }
-
-    fn rent_params<T>(&mut self) -> Result<RentParams<T>>
-    where
-        T: Environment,
-    {
-        use crate::arithmetic::Saturating as _;
-
-        let total_balance = self.balance::<T>();
-
-        // the off-chain environment does currently not support reserved balance,
-        // hence we just use the total balance here.
-        let free_balance = self.balance::<T>();
-
-        let deposit_per_contract = self.chain_spec.deposit_per_contract::<T>()?;
-        let deposit_per_storage_byte = self.chain_spec.deposit_per_storage_byte::<T>()?;
-        let deposit_per_storage_item = self.chain_spec.deposit_per_storage_item::<T>()?;
-        let rent_fraction = self.chain_spec.rent_fraction::<T>()?;
-        let minimum_balance: T::Balance = self.minimum_balance::<T>();
-        let tombstone_deposit = self.tombstone_deposit::<T>();
-        let subsistence_threshold = minimum_balance.saturating_add(tombstone_deposit);
-        let rent_allowance = self.rent_allowance::<T>();
-
-        Ok(RentParams {
-            deposit_per_contract,
-            deposit_per_storage_byte,
-            deposit_per_storage_item,
-            rent_fraction,
-            subsistence_threshold,
-
-            rent_allowance,
-            total_balance,
-            free_balance,
-
-            storage_size: 0,
-            code_size: 0,
-            code_refcount: 0,
-
-            _reserved: None,
-        })
-    }
-
-    fn rent_status<T>(
-        &mut self,
-        _at_refcount: Option<core::num::NonZeroU32>,
-    ) -> Result<RentStatus<T>>
-    where
-        T: Environment,
-    {
-        unimplemented!("off-chain environment does not support rent status")
-    }
-
     fn block_number<T: Environment>(&mut self) -> T::BlockNumber {
         self.current_block()
             .expect(UNINITIALIZED_EXEC_CONTEXT)
@@ -466,29 +407,12 @@ impl TypedEnvBackend for EnvInstance {
             })
     }
 
-    fn tombstone_deposit<T: Environment>(&mut self) -> T::Balance {
-        self.chain_spec
-            .tombstone_deposit::<T>()
-            .unwrap_or_else(|error| {
-                panic!("could not read `tombstone_deposit` property: {:?}", error)
-            })
-    }
-
     fn emit_event<T, Event>(&mut self, new_event: Event)
     where
         T: Environment,
         Event: Topics + scale::Encode + Debug,
     {
         self.emitted_events.record::<T, Event>(new_event)
-    }
-
-    fn set_rent_allowance<T>(&mut self, new_rent_allowance: T::Balance)
-    where
-        T: Environment,
-    {
-        self.callee_account_mut()
-            .set_rent_allowance::<T>(new_rent_allowance)
-            .expect("could not encode rent allowance")
     }
 
     fn invoke_contract<T, Args>(&mut self, params: &CallParams<T, Args, ()>) -> Result<()>
@@ -538,18 +462,6 @@ impl TypedEnvBackend for EnvInstance {
         T: Environment,
     {
         self.terminate_contract_impl::<T>(beneficiary)
-    }
-
-    fn restore_contract<T>(
-        &mut self,
-        _account_id: T::AccountId,
-        _code_hash: T::Hash,
-        _rent_allowance: T::Balance,
-        _filtered_keys: &[Key],
-    ) where
-        T: Environment,
-    {
-        unimplemented!("off-chain environment does not support contract restoration")
     }
 
     fn transfer<T>(&mut self, destination: T::AccountId, value: T::Balance) -> Result<()>

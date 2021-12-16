@@ -25,8 +25,11 @@ use core::{
     result::Result,
 };
 use proc_macro2::{
+    Group as Group2,
     Ident,
     Span,
+    TokenStream as TokenStream2,
+    TokenTree as TokenTree2,
 };
 use std::collections::HashMap;
 use syn::spanned::Spanned;
@@ -207,8 +210,8 @@ impl InkAttribute {
         Ok(())
     }
 
-    /// Converts a sequence of `#[ink(..)]` attributes into a single flattened
-    /// `#[ink(..)]` attribute that contains all of the input arguments.
+    /// Converts a sequence of `#[ink(...)]` attributes into a single flattened
+    /// `#[ink(...)]` attribute that contains all of the input arguments.
     ///
     /// # Example
     ///
@@ -225,8 +228,7 @@ impl InkAttribute {
     {
         let args = attrs
             .into_iter()
-            .map(|attr| attr.args)
-            .flatten()
+            .flat_map(|attr| attr.args)
             .collect::<Vec<_>>();
         if args.is_empty() {
             return Err(format_err!(
@@ -265,7 +267,7 @@ impl InkAttribute {
     }
 
     /// Returns the selector of the ink! attribute if any.
-    pub fn selector(&self) -> Option<ir::Selector> {
+    pub fn selector(&self) -> Option<SelectorOrWildcard> {
         self.args().find_map(|arg| {
             if let ir::AttributeArg::Selector(selector) = arg.kind() {
                 return Some(*selector)
@@ -278,6 +280,16 @@ impl InkAttribute {
     pub fn is_payable(&self) -> bool {
         self.args()
             .any(|arg| matches!(arg.kind(), AttributeArg::Payable))
+    }
+
+    /// Returns `true` if the ink! attribute contains the wildcard selector.
+    pub fn has_wildcard_selector(&self) -> bool {
+        self.args().any(|arg| {
+            matches!(
+                arg.kind(),
+                AttributeArg::Selector(SelectorOrWildcard::Wildcard)
+            )
+        })
     }
 
     /// Returns `true` if the ink! attribute contains the `anonymous` argument.
@@ -342,6 +354,7 @@ pub enum AttributeArgKind {
     Constructor,
     /// `#[ink(payable)]`
     Payable,
+    /// `#[ink(selector = _)]`
     /// `#[ink(selector = 0xDEADBEEF)]`
     Selector,
     /// `#[ink(extension = N: u32)]`
@@ -395,11 +408,15 @@ pub enum AttributeArg {
     /// Applied on ink! constructors or messages in order to specify that they
     /// can receive funds from callers.
     Payable,
-    /// `#[ink(selector = 0xDEADBEEF)]`
+    /// Can be either one of:
     ///
-    /// Applied on ink! constructors or messages to manually control their
-    /// selectors.
-    Selector(Selector),
+    /// - `#[ink(selector = 0xDEADBEEF)]`
+    ///   Applied on ink! constructors or messages to manually control their
+    ///   selectors.
+    /// - `#[ink(selector = _)]`
+    ///   Applied on ink! messages to define a fallback messages that is invoked
+    ///   if no other ink! message matches a given selector.
+    Selector(SelectorOrWildcard),
     /// `#[ink(namespace = "my_namespace")]`
     ///
     /// Applied on ink! trait implementation blocks to disambiguate other trait
@@ -413,8 +430,8 @@ pub enum AttributeArg {
     /// of them. This is useful if such an implementation block does not contain
     /// any other ink! attributes, so it would be flagged by ink! as a Rust item.
     /// Adding `#[ink(impl)]` on such implementation blocks makes them treated
-    /// as ink! implementation blocks thus allowing to access the environment
-    /// etc. Note that ink! messages and constructors still need to be explicitly
+    /// as ink! implementation blocks thus allowing to access the environment, etc..
+    /// Note that ink! messages and constructors still need to be explicitly
     /// flagged as such.
     Implementation,
     /// `#[ink(extension = N: u32)]`
@@ -449,7 +466,7 @@ impl core::fmt::Display for AttributeArgKind {
             Self::Constructor => write!(f, "constructor"),
             Self::Payable => write!(f, "payable"),
             Self::Selector => {
-                write!(f, "selector = S:[u8; 4]")
+                write!(f, "selector = S:[u8; 4] || _")
             }
             Self::Extension => {
                 write!(f, "extension = N:u32)")
@@ -495,9 +512,7 @@ impl core::fmt::Display for AttributeArg {
             Self::Message => write!(f, "message"),
             Self::Constructor => write!(f, "constructor"),
             Self::Payable => write!(f, "payable"),
-            Self::Selector(selector) => {
-                write!(f, "selector = {:?}", selector.to_bytes())
-            }
+            Self::Selector(selector) => core::fmt::Display::fmt(&selector, f),
             Self::Extension(extension) => {
                 write!(f, "extension = {:?}", extension.into_u32())
             }
@@ -507,6 +522,32 @@ impl core::fmt::Display for AttributeArg {
             Self::Implementation => write!(f, "impl"),
             Self::HandleStatus(value) => write!(f, "handle_status = {:?}", value),
             Self::ReturnsResult(value) => write!(f, "returns_result = {:?}", value),
+        }
+    }
+}
+
+/// Either a wildcard selector or a specified selector.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum SelectorOrWildcard {
+    /// A wildcard selector. If no other selector matches, the message/constructor
+    /// annotated with the wildcard selector will be invoked.
+    Wildcard,
+    /// A user provided selector.
+    UserProvided(ir::Selector),
+}
+
+impl SelectorOrWildcard {
+    /// Create a new `SelectorOrWildcard::Selector` from the supplied bytes.
+    fn selector(bytes: [u8; 4]) -> SelectorOrWildcard {
+        SelectorOrWildcard::UserProvided(Selector::from(bytes))
+    }
+}
+
+impl core::fmt::Display for SelectorOrWildcard {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> Result<(), core::fmt::Error> {
+        match self {
+            Self::UserProvided(selector) => core::fmt::Debug::fmt(&selector, f),
+            Self::Wildcard => write!(f, "_"),
         }
     }
 }
@@ -532,7 +573,7 @@ impl Namespace {
 }
 
 /// Returns `true` if the given iterator yields at least one attribute of the form
-/// `#[ink(..)]` or `#[ink]`.
+/// `#[ink(...)]` or `#[ink]`.
 ///
 /// # Note
 ///
@@ -723,13 +764,66 @@ impl From<InkAttribute> for Attribute {
     }
 }
 
+/// This function replaces occurrences of a `TokenTree::Ident` of the sequence
+/// `selector = _` with the sequence `selector = "_"`.
+///
+/// This is done because `syn::Attribute::parse_meta` does not support parsing a
+/// verbatim like `_`. For this we would need to switch to `syn::Attribute::parse_args`,
+/// which requires a more in-depth rewrite of our IR parsing.
+fn transform_wildcard_selector_to_string(group: Group2) -> TokenTree2 {
+    let mut found_selector = false;
+    let mut found_equal = false;
+
+    let new_group: TokenStream2 = group
+        .stream()
+        .into_iter()
+        .map(|tt| {
+            match tt {
+                TokenTree2::Group(grp) => transform_wildcard_selector_to_string(grp),
+                TokenTree2::Ident(ident)
+                    if found_selector && found_equal && ident == "_" =>
+                {
+                    let mut lit = proc_macro2::Literal::string("_");
+                    lit.set_span(ident.span());
+                    found_selector = false;
+                    found_equal = false;
+                    TokenTree2::Literal(lit)
+                }
+                TokenTree2::Ident(ident) if ident == "selector" => {
+                    found_selector = true;
+                    TokenTree2::Ident(ident)
+                }
+                TokenTree2::Punct(punct) if punct.as_char() == '=' => {
+                    found_equal = true;
+                    TokenTree2::Punct(punct)
+                }
+                _ => tt,
+            }
+        })
+        .collect();
+    TokenTree2::Group(Group2::new(group.delimiter(), new_group))
+}
+
 impl TryFrom<syn::Attribute> for InkAttribute {
     type Error = syn::Error;
 
-    fn try_from(attr: syn::Attribute) -> Result<Self, Self::Error> {
+    fn try_from(mut attr: syn::Attribute) -> Result<Self, Self::Error> {
         if !attr.path.is_ident("ink") {
             return Err(format_err_spanned!(attr, "unexpected non-ink! attribute"))
         }
+
+        let ts: TokenStream2 = attr
+            .tokens
+            .into_iter()
+            .map(|tt| {
+                match tt {
+                    TokenTree2::Group(grp) => transform_wildcard_selector_to_string(grp),
+                    _ => tt,
+                }
+            })
+            .collect();
+        attr.tokens = ts;
+
         match attr.parse_meta().map_err(|_| {
             format_err_spanned!(attr, "unexpected ink! attribute structure")
         })? {
@@ -809,6 +903,23 @@ impl TryFrom<syn::NestedMeta> for AttributeFrag {
                 match &meta {
                     syn::Meta::NameValue(name_value) => {
                         if name_value.path.is_ident("selector") {
+                            if let syn::Lit::Str(lit_str) = &name_value.lit {
+                                let argument = lit_str.value();
+                                // We've pre-processed the verbatim `_` to `"_"`. This was done
+                                // because `syn::Attribute::parse_meta` does not support verbatim.
+                                if argument != "_" {
+                                    return Err(format_err!(
+                                        name_value,
+                                        "#[ink(selector = ..)] attributes with string inputs are deprecated. \
+                                        use an integer instead, e.g. #[ink(selector = 1)] or #[ink(selector = 0xC0DECAFE)]."
+                                    ))
+                                }
+                                return Ok(AttributeFrag {
+                                    ast: meta,
+                                    arg: AttributeArg::Selector(SelectorOrWildcard::Wildcard),
+                                })
+                            }
+
                             if let syn::Lit::Int(lit_int) = &name_value.lit {
                                 let selector_u32 = lit_int.base10_parse::<u32>()
                                     .map_err(|error| {
@@ -821,17 +932,10 @@ impl TryFrom<syn::NestedMeta> for AttributeFrag {
                                 let selector = Selector::from(selector_u32.to_be_bytes());
                                 return Ok(AttributeFrag {
                                     ast: meta,
-                                    arg: AttributeArg::Selector(selector),
+                                    arg: AttributeArg::Selector(SelectorOrWildcard::UserProvided(selector)),
                                 })
                             }
-                            if let syn::Lit::Str(_) = &name_value.lit {
-                                return Err(format_err!(
-                                    name_value,
-                                    "#[ink(selector = ..)] attributes with string inputs are deprecated. \
-                                    use an integer instead, e.g. #[ink(selector = 1)] or #[ink(selector = 0xC0DECAFE)]."
-                                ))
-                            }
-                            return Err(format_err!(name_value, "expecteded 4-digit hexcode for `selector` argument, e.g. #[ink(selector = 0xC0FEBABE]"))
+                            return Err(format_err!(name_value, "expected 4-digit hexcode for `selector` argument, e.g. #[ink(selector = 0xC0FEBABE]"))
                         }
                         if name_value.path.is_ident("namespace") {
                             if let syn::Lit::Str(lit_str) = &name_value.lit {
@@ -865,7 +969,7 @@ impl TryFrom<syn::NestedMeta> for AttributeFrag {
                                     ),
                                 })
                             }
-                            return Err(format_err!(name_value, "expecteded `u32` integer type for `N` in #[ink(extension = N)]"))
+                            return Err(format_err!(name_value, "expected `u32` integer type for `N` in #[ink(extension = N)]"))
                         }
                         if name_value.path.is_ident("handle_status") {
                             if let syn::Lit::Bool(lit_bool) = &name_value.lit {
@@ -875,7 +979,7 @@ impl TryFrom<syn::NestedMeta> for AttributeFrag {
                                     arg: AttributeArg::HandleStatus(value),
                                 })
                             }
-                            return Err(format_err!(name_value, "expecteded `bool` value type for `flag` in #[ink(handle_status = flag)]"))
+                            return Err(format_err!(name_value, "expected `bool` value type for `flag` in #[ink(handle_status = flag)]"))
                         }
                         if name_value.path.is_ident("returns_result") {
                             if let syn::Lit::Bool(lit_bool) = &name_value.lit {
@@ -885,7 +989,7 @@ impl TryFrom<syn::NestedMeta> for AttributeFrag {
                                     arg: AttributeArg::ReturnsResult(value),
                                 })
                             }
-                            return Err(format_err!(name_value, "expecteded `bool` value type for `flag` in #[ink(returns_result = flag)]"))
+                            return Err(format_err!(name_value, "expected `bool` value type for `flag` in #[ink(returns_result = flag)]"))
                         }
                         Err(format_err_spanned!(
                             meta,
@@ -1116,7 +1220,7 @@ mod tests {
                 #[ink(selector = 42)]
             },
             Ok(test::Attribute::Ink(vec![AttributeArg::Selector(
-                Selector::from([0, 0, 0, 42]),
+                SelectorOrWildcard::UserProvided(Selector::from([0, 0, 0, 42])),
             )])),
         );
         assert_attribute_try_from(
@@ -1124,7 +1228,7 @@ mod tests {
                 #[ink(selector = 0xDEADBEEF)]
             },
             Ok(test::Attribute::Ink(vec![AttributeArg::Selector(
-                Selector::from([0xDE, 0xAD, 0xBE, 0xEF]),
+                SelectorOrWildcard::selector([0xDE, 0xAD, 0xBE, 0xEF]),
             )])),
         );
     }
@@ -1161,7 +1265,7 @@ mod tests {
             syn::parse_quote! {
                 #[ink(selector = true)]
             },
-            Err("expecteded 4-digit hexcode for `selector` argument, e.g. #[ink(selector = 0xC0FEBABE]"),
+            Err("expected 4-digit hexcode for `selector` argument, e.g. #[ink(selector = 0xC0FEBABE]"),
         );
     }
 
@@ -1228,7 +1332,7 @@ mod tests {
             syn::parse_quote! {
                 #[ink(extension = "string")]
             },
-            Err("expecteded `u32` integer type for `N` in #[ink(extension = N)]"),
+            Err("expected `u32` integer type for `N` in #[ink(extension = N)]"),
         );
     }
 
@@ -1306,9 +1410,7 @@ mod tests {
             syn::parse_quote! {
                 #[ink(handle_status = "string")]
             },
-            Err(
-                "expecteded `bool` value type for `flag` in #[ink(handle_status = flag)]",
-            ),
+            Err("expected `bool` value type for `flag` in #[ink(handle_status = flag)]"),
         );
     }
 
@@ -1352,7 +1454,7 @@ mod tests {
             syn::parse_quote! {
                 #[ink(returns_result = "string")]
             },
-            Err("expecteded `bool` value type for `flag` in #[ink(returns_result = flag)]"),
+            Err("expected `bool` value type for `flag` in #[ink(returns_result = flag)]"),
         );
     }
 
