@@ -242,7 +242,7 @@ impl ContractRef<'_> {
     ) -> TokenStream2 {
         use ir::Callable as _;
         let span = message.span();
-        let trait_info = generator::generate_reference_to_trait_info(span, trait_path);
+        let trait_info_id = generator::generate_reference_to_trait_info(span, trait_path);
         let message_ident = message.ident();
         let output_ident = generator::output_ident(message_ident);
         let call_operator = match message.receiver() {
@@ -266,7 +266,7 @@ impl ContractRef<'_> {
                 #( , #input_bindings : #input_types )*
             ) -> Self::#output_ident {
                 <_ as #trait_path>::#message_ident(
-                    <_ as ::ink_lang::codegen::TraitCallForwarderFor<#trait_info>>::#forward_operator(
+                    <_ as ::ink_lang::codegen::TraitCallForwarderFor<{#trait_info_id}>>::#forward_operator(
                         <Self as ::ink_lang::codegen::TraitCallBuilder>::#call_operator(self),
                     )
                     #( , #input_bindings )*
@@ -332,7 +332,11 @@ impl ContractRef<'_> {
     ) -> TokenStream2 {
         use ir::Callable as _;
         let span = message.span();
-        let attrs = message.attrs();
+        let attrs = self
+            .contract
+            .config()
+            .whitelisted_attributes()
+            .filter_attr(message.attrs().to_vec());
         let storage_ident = self.contract.module().storage().ident();
         let message_ident = message.ident();
         let call_operator = match message.receiver() {
@@ -375,7 +379,11 @@ impl ContractRef<'_> {
         constructor: ir::CallableWithSelector<ir::Constructor>,
     ) -> TokenStream2 {
         let span = constructor.span();
-        let attrs = constructor.attrs();
+        let attrs = self
+            .contract
+            .config()
+            .whitelisted_attributes()
+            .filter_attr(constructor.attrs().to_vec());
         let constructor_ident = constructor.ident();
         let selector_bytes = constructor.composed_selector().hex_lits();
         let input_bindings = generator::input_bindings(constructor.inputs());

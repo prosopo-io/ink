@@ -5,11 +5,8 @@ use ink_lang as ink;
 #[ink::contract]
 mod dns {
     use ink_storage::{
-        lazy::{
-            Lazy,
-            Mapping,
-        },
         traits::SpreadAllocate,
+        Mapping,
     };
 
     /// Emitted whenever a new name is being registered.
@@ -68,7 +65,7 @@ mod dns {
         /// A hashmap to store all name to owners mapping.
         name_to_owner: Mapping<Hash, AccountId>,
         /// The default address.
-        default_address: Lazy<AccountId>,
+        default_address: AccountId,
     }
 
     /// Errors that can occur upon calling this contract.
@@ -88,7 +85,9 @@ mod dns {
         /// Creates a new domain name service contract.
         #[ink(constructor)]
         pub fn new() -> Self {
-            ink_lang::codegen::initialize_contract(|contract: &mut Self| {
+            // This call is required in order to correctly initialize the
+            // `Mapping`s of our contract.
+            ink_lang::utils::initialize_contract(|contract: &mut Self| {
                 contract.default_address = Default::default();
             })
         }
@@ -156,18 +155,24 @@ mod dns {
             self.get_address_or_default(name)
         }
 
+        /// Get owner of specific name.
+        #[ink(message)]
+        pub fn get_owner(&self, name: Hash) -> AccountId {
+            self.get_owner_or_default(name)
+        }
+
         /// Returns the owner given the hash or the default address.
         fn get_owner_or_default(&self, name: Hash) -> AccountId {
             self.name_to_owner
                 .get(&name)
-                .unwrap_or(*self.default_address)
+                .unwrap_or(self.default_address)
         }
 
         /// Returns the address given the hash or the default address.
         fn get_address_or_default(&self, name: Hash) -> AccountId {
             self.name_to_address
                 .get(&name)
-                .unwrap_or(*self.default_address)
+                .unwrap_or(self.default_address)
         }
     }
 
@@ -176,24 +181,13 @@ mod dns {
         use super::*;
         use ink_lang as ink;
 
-        const DEFAULT_CALLEE_HASH: [u8; 32] = [0x07; 32];
-        const DEFAULT_ENDOWMENT: Balance = 1_000_000;
-        const DEFAULT_GAS_LIMIT: u64 = 1_000_000;
-
         fn default_accounts(
         ) -> ink_env::test::DefaultAccounts<ink_env::DefaultEnvironment> {
-            ink_env::test::default_accounts::<ink_env::DefaultEnvironment>()
-                .expect("off-chain environment should have been initialized already")
+            ink_env::test::default_accounts::<Environment>()
         }
 
         fn set_next_caller(caller: AccountId) {
-            ink_env::test::push_execution_context::<ink_env::DefaultEnvironment>(
-                caller,
-                AccountId::from(DEFAULT_CALLEE_HASH),
-                DEFAULT_GAS_LIMIT,
-                DEFAULT_ENDOWMENT,
-                ink_env::test::CallData::new(ink_env::call::Selector::new([0x00; 4])),
-            )
+            ink_env::test::set_caller::<Environment>(caller);
         }
 
         #[ink::test]

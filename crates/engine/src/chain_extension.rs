@@ -12,8 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use super::OffChainError;
-use crate::Result;
+use super::Error;
 use derive_more::From;
 use std::collections::{
     hash_map::Entry,
@@ -50,7 +49,14 @@ pub trait ChainExtension {
     /// Calls the chain extension with the given input.
     ///
     /// Returns an error code and may fill the `output` buffer with a SCALE encoded result.
+    #[allow(clippy::ptr_arg)]
     fn call(&mut self, input: &[u8], output: &mut Vec<u8>) -> u32;
+}
+
+impl Default for ChainExtensionHandler {
+    fn default() -> Self {
+        ChainExtensionHandler::new()
+    }
 }
 
 impl ChainExtensionHandler {
@@ -80,7 +86,7 @@ impl ChainExtensionHandler {
     /// Evaluates the chain extension with the given parameters.
     ///
     /// Upon success returns the values returned by the evaluated chain extension.
-    pub fn eval(&mut self, func_id: u32, input: &[u8]) -> Result<(u32, &[u8])> {
+    pub fn eval(&mut self, func_id: u32, input: &[u8]) -> Result<(u32, &[u8]), Error> {
         self.output.clear();
         let extension_id = ExtensionId::from(func_id);
         match self.registered.entry(extension_id) {
@@ -88,9 +94,7 @@ impl ChainExtensionHandler {
                 let status_code = occupied.into_mut().call(input, &mut self.output);
                 Ok((status_code, &mut self.output))
             }
-            Entry::Vacant(_vacant) => {
-                Err(OffChainError::UnregisteredChainExtension.into())
-            }
+            Entry::Vacant(_vacant) => Err(Error::UnregisteredChainExtension),
         }
     }
 }

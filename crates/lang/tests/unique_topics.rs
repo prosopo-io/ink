@@ -59,19 +59,13 @@ mod my_contract {
         }
     }
 
-    #[cfg(not(feature = "ink-experimental-engine"))]
     #[cfg(test)]
     mod tests {
         use super::*;
         use ink_env::test::EmittedEvent;
         use ink_lang as ink;
 
-        // The following test unfortunately has to be ignored until we make
-        // `ink-experimental-engine` the default with https://github.com/paritytech/ink/issues/565.
-        // See the issue for details.
-        #[ignore]
         #[ink::test]
-        #[cfg(feature = "ink-experimental-engine")]
         fn event_must_have_unique_topics() {
             // given
             let my_contract = MyContract::new();
@@ -91,31 +85,11 @@ mod my_contract {
             assert!(!has_duplicates(&mut encoded_topics));
         }
 
-        #[ink::test]
-        fn event_must_have_unique_topics() {
-            // given
-            let my_contract = MyContract::new();
-
-            // when
-            MyContract::emit_my_event(&my_contract);
-
-            // then
-            // all topics must be unique
-            let emitted_events =
-                ink_env::test::recorded_events().collect::<Vec<EmittedEvent>>();
-            let mut encoded_topics: std::vec::Vec<&[u8]> = emitted_events[0]
-                .topics
-                .iter()
-                .map(|topic| topic.encoded_bytes().expect("encoded bytes must exist"))
-                .collect();
-            assert!(!has_duplicates(&mut encoded_topics));
-        }
-
         /// Finds duplicates in a given vector.
         ///
         /// This function has complexity of `O(n * log n)` and no additional memory
         /// is required, although the order of items is not preserved.
-        fn has_duplicates<T: PartialEq + AsRef<[u8]>>(items: &mut Vec<T>) -> bool {
+        fn has_duplicates<T: PartialEq + AsRef<[u8]>>(items: &mut [T]) -> bool {
             // Sort the vector
             items.sort_by(|a, b| Ord::cmp(a.as_ref(), b.as_ref()));
             // And then find any two consecutive equal elements.
