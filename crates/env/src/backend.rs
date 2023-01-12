@@ -367,6 +367,13 @@ pub trait TypedEnvBackend: EnvBackend {
     /// For more details visit: [`block_timestamp`][`crate::block_timestamp`]
     fn block_timestamp<E: Environment>(&mut self) -> E::Timestamp;
 
+    /// Returns the hash of the current block.
+    ///
+    /// # Note
+    ///
+    /// For more details visit: [`block_hash`][`crate::block_hash`]
+    fn block_hash<E: Environment>(&mut self) -> E::Hash;
+
     /// Returns the address of the executed contract.
     ///
     /// # Note

@@ -259,12 +259,53 @@ where
         ink_env::block_timestamp::<E>()
     }
 
+    /// Returns the hash of the current block.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// #[ink::contract]
+    /// pub mod my_contract {
+    ///     #[ink(storage)]
+    ///     pub struct MyContract {
+    ///         last_hash: hash
+    ///     }
+    ///
+    ///     impl MyContract {
+    ///         #[ink(constructor)]
+    ///         pub fn new() -> Self {
+    ///             Self {
+    ///                 last_hash: Self::env().block_hash()
+    ///             }
+    ///         }
+    ///
+    ///         /// Records the last hash when the message was invoked.
+    ///         #[ink(message)]
+    ///         pub fn execute_me(&mut self) {
+    ///             self.last_hash = self.env().block_hash();
+    ///         }
+    ///     }
+    /// }
+    /// ```
+    ///
+    /// # Note
+    ///
+    /// The Substrate default for the hash type is the milliseconds since the
+    /// Unix epoch. However, this is not guaranteed: the specific hash is
+    /// defined by the chain environment on which this contract runs.
+    ///
+    /// For more details visit: [`ink_env::block_hash`]
+    pub fn block_hash(self) -> E::Hash {
+        ink_env::block_hash::<E>()
+    }
+
+
     /// Returns the account ID of the executed contract.
     ///
     /// # Example
     ///
     /// ```
-    /// 
+    ///
     /// #[ink::contract]
     /// pub mod only_owner {
     ///     #[ink(storage)]
@@ -342,7 +383,7 @@ where
     /// # Example
     ///
     /// ```
-    /// 
+    ///
     /// #[ink::contract]
     /// pub mod my_contract {
     ///     #[ink(storage)]

@@ -22,6 +22,7 @@ use crate::{
     Error,
 };
 use std::collections::HashMap;
+use ink_primitives::Hash;
 
 /// Record for an emitted event.
 #[derive(Clone)]
@@ -224,8 +225,9 @@ impl Engine {
     pub fn advance_block(&mut self) {
         self.exec_context.block_number += 1;
         self.exec_context.block_timestamp += self.chain_spec.block_time;
+        self.exec_context.block_hash = Hash::default();
     }
-
+    
     /// Returns the callee, i.e. the currently executing contract.
     pub fn get_callee(&self) -> Vec<u8> {
         self.exec_context.callee()

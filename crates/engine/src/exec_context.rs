@@ -11,7 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
+use ink_primitives::Hash;
 use super::types::{
     AccountId,
     Balance,
@@ -43,6 +43,8 @@ pub struct ExecContext {
     pub block_number: BlockNumber,
     /// The current block timestamp.
     pub block_timestamp: BlockTimestamp,
+    /// The current block hash.
+    pub block_hash: Hash,
 }
 
 impl ExecContext {

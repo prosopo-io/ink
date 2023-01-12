@@ -385,6 +385,10 @@ impl TypedEnvBackend for EnvInstance {
         self.get_property_little_endian::<E::Timestamp>(ext::now)
     }
 
+    fn block_hash<E: Environment>(&mut self) -> E::Hash {
+        self.get_property_little_endian::<E::hash>(ext::now)
+    }
+
     fn account_id<E: Environment>(&mut self) -> E::AccountId {
         self.get_property_inplace::<E::AccountId>(ext::address)
     }

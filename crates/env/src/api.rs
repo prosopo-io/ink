@@ -111,6 +111,20 @@ where
     })
 }
 
+/// Returns the current block hash.
+///
+/// # Errors
+///
+/// If the returned value cannot be properly decoded.
+pub fn block_hash<E>() -> E::Hash
+    where
+        E: Environment,
+{
+    <EnvInstance as OnInstance>::on_instance(|instance| {
+        TypedEnvBackend::block_hash::<E>(instance)
+    })
+}
+
 /// Returns the account ID of the executed contract.
 ///
 /// # Note

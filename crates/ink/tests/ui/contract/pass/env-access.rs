@@ -9,6 +9,7 @@ mod contract {
             let _ = Self::env().account_id();
             let _ = Self::env().balance();
             let _ = Self::env().block_timestamp();
+            let _ = Self::env().block_hash();
             let _ = Self::env().block_number();
             let _ = Self::env().caller();
             let _ = Self::env().gas_left();
@@ -23,6 +24,7 @@ mod contract {
             let _ = self.env().account_id();
             let _ = self.env().balance();
             let _ = self.env().block_timestamp();
+            let _ = self.env().block_hash();
             let _ = self.env().block_number();
             let _ = self.env().caller();
             let _ = self.env().gas_left();

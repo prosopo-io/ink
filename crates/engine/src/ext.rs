@@ -401,6 +401,13 @@ impl Engine {
         set_output(output, &block_timestamp[..])
     }
 
+    /// Returns the hash of the current block.
+    pub fn block_hash(&self, output: &mut &mut [u8]) {
+        let block_hash: Vec<u8> =
+            scale::Encode::encode(&self.exec_context.block_hash);
+        set_output(output, &block_hash[..])
+    }
+
     pub fn gas_left(&self, _output: &mut &mut [u8]) {
         unimplemented!("off-chain environment does not yet support `gas_left`");
     }

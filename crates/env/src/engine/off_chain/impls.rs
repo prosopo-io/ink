@@ -398,6 +398,14 @@ impl TypedEnvBackend for EnvInstance {
             })
     }
 
+
+    fn block_hash<E: Environment>(&mut self) -> E::Hash {
+        self.get_property::<E::Hash>(Engine::block_hash)
+            .unwrap_or_else(|error| {
+                panic!("could not read `block_hash` property: {:?}", error)
+            })
+    }
+
     fn account_id<E: Environment>(&mut self) -> E::AccountId {
         self.get_property::<E::AccountId>(Engine::address)
             .unwrap_or_else(|error| {
