@@ -386,7 +386,7 @@ impl TypedEnvBackend for EnvInstance {
     }
 
     fn block_hash<E: Environment>(&mut self) -> E::Hash {
-        self.get_property_inplace::<E::Hash where <E as Environment>::Hash: Default>(ext::block_hash)
+        self.get_property_inplace::<E::Hash>(ext::block_hash)
     }
 
     fn account_id<E: Environment>(&mut self) -> E::AccountId {
