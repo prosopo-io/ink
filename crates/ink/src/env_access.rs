@@ -290,12 +290,13 @@ where
     ///
     /// # Note
     ///
-    /// The Substrate default for the hash type is the milliseconds since the
-    /// Unix epoch. However, this is not guaranteed: the specific hash is
-    /// defined by the chain environment on which this contract runs.
+    /// The Substrate default for the hash type is ...
     ///
     /// For more details visit: [`ink_env::block_hash`]
-    pub fn block_hash(self) -> E::Hash where <E as Environment>::Hash: Default {
+    pub fn block_hash(self) -> E::Hash
+    where
+        <E as Environment>::Hash: Default,
+    {
         ink_env::block_hash::<E>()
     }
 
