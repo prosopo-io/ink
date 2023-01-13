@@ -11,13 +11,13 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-use ink_primitives::Hash;
 use super::types::{
     AccountId,
     Balance,
     BlockNumber,
     BlockTimestamp,
 };
+use ink_primitives::Hash;
 
 /// The context of a contract execution.
 #[cfg_attr(test, derive(Debug, PartialEq, Eq))]

@@ -117,8 +117,8 @@ where
 ///
 /// If the returned value cannot be properly decoded.
 pub fn block_hash<E>() -> E::Hash
-    where
-        E: Environment,
+where
+    E: Environment,
 {
     <EnvInstance as OnInstance>::on_instance(|instance| {
         TypedEnvBackend::block_hash::<E>(instance)

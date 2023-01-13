@@ -403,8 +403,7 @@ impl Engine {
 
     /// Returns the hash of the current block.
     pub fn block_hash(&self, output: &mut &mut [u8]) {
-        let block_hash: Vec<u8> =
-            scale::Encode::encode(&self.exec_context.block_hash);
+        let block_hash: Vec<u8> = scale::Encode::encode(&self.exec_context.block_hash);
         set_output(output, &block_hash[..])
     }
 

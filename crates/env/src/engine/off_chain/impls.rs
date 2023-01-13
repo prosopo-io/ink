@@ -398,7 +398,6 @@ impl TypedEnvBackend for EnvInstance {
             })
     }
 
-
     fn block_hash<E: Environment>(&mut self) -> E::Hash {
         self.get_property::<E::Hash>(Engine::block_hash)
             .unwrap_or_else(|error| {

@@ -299,13 +299,12 @@ where
         ink_env::block_hash::<E>()
     }
 
-
     /// Returns the account ID of the executed contract.
     ///
     /// # Example
     ///
     /// ```
-    ///
+    /// 
     /// #[ink::contract]
     /// pub mod only_owner {
     ///     #[ink(storage)]
@@ -383,7 +382,7 @@ where
     /// # Example
     ///
     /// ```
-    ///
+    /// 
     /// #[ink::contract]
     /// pub mod my_contract {
     ///     #[ink(storage)]
