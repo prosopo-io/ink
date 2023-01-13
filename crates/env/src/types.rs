@@ -154,6 +154,18 @@ pub trait Environment {
         + AtLeast32BitUnsigned
         + FromLittleEndian;
 
+    /// The type of block number.
+    type BlockHash: 'static
+        + scale::Codec
+        + Copy
+        + Clone
+        + Clear
+        + PartialEq
+        + Eq
+        + Ord
+        + AsRef<[u8]>
+        + AsMut<[u8]>;
+
     /// The chain extension for the environment.
     ///
     /// This is a type that is defined through the `#[ink::chain_extension]` procedural macro.
@@ -179,6 +191,7 @@ impl Environment for DefaultEnvironment {
     type Hash = Hash;
     type Timestamp = Timestamp;
     type BlockNumber = BlockNumber;
+    type BlockHash = Hash;
     type ChainExtension = NoChainExtension;
 }
 
@@ -193,3 +206,6 @@ pub type Gas = u64;
 
 /// The default block number type.
 pub type BlockNumber = u32;
+
+/// The default block hash type.
+pub type BlockHash = Hash;

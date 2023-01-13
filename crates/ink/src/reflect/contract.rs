@@ -64,7 +64,7 @@ pub trait ContractName {
 /// # Usage: Default Environment
 ///
 /// ```
-/// 
+///
 /// #[ink::contract]
 /// pub mod contract {
 ///     #[ink(storage)]
@@ -105,6 +105,7 @@ pub trait ContractName {
 ///     type Balance = u64;
 ///     type Hash = <DefaultEnvironment as Environment>::Hash;
 ///     type BlockNumber = u32;
+///     type BlockHash = <DefaultEnvironment as Environment>::Hash;
 ///     type Timestamp = u64;
 ///     type ChainExtension = <DefaultEnvironment as Environment>::ChainExtension;
 /// }
@@ -153,7 +154,7 @@ pub trait ContractEnv {
 /// # Usage
 ///
 /// ```
-/// 
+///
 /// #[ink::contract]
 /// pub mod contract {
 ///     #[ink(storage)]
