@@ -154,7 +154,7 @@ pub trait Environment {
         + AtLeast32BitUnsigned
         + FromLittleEndian;
 
-    /// The type of block number.
+    /// The type of block hash.
     type BlockHash: 'static
         + scale::Codec
         + Copy
@@ -191,7 +191,7 @@ impl Environment for DefaultEnvironment {
     type Hash = Hash;
     type Timestamp = Timestamp;
     type BlockNumber = BlockNumber;
-    type BlockHash = Hash;
+    type BlockHash = BlockHash;
     type ChainExtension = NoChainExtension;
 }
 
@@ -208,4 +208,4 @@ pub type Gas = u64;
 pub type BlockNumber = u32;
 
 /// The default block hash type.
-pub type BlockHash = Hash;
+pub type BlockHash = [u8; 32];
