@@ -23,9 +23,6 @@ pub type BlockNumber = u32;
 /// Same type as the `DefaultEnvironment::BlockTimestamp` type.
 pub type BlockTimestamp = u64;
 
-/// Same type as the `DefaultEnvironment::Hash` type.
-pub type BlockHash = [u8; 32];
-
 /// Same type as the `DefaultEnvironment::Balance` type.
 pub type Balance = u128;
 
@@ -42,6 +39,28 @@ impl AccountId {
 
     /// Returns the `AccountId` as bytes.
     pub fn as_bytes(&self) -> &[u8] {
+        &self.0[..]
+    }
+}
+
+/// The Account Id type used by this crate.
+#[derive(Debug, From, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+#[repr(transparent)]
+pub struct BlockHash(Vec<u8>);
+
+impl BlockHash {
+    /// Creates a new `BlockHash` from the given raw bytes.
+    pub fn from_bytes(bytes: &[u8]) -> Self {
+        Self(bytes.to_vec())
+    }
+
+    /// Returns the `BlockHash` as bytes.
+    pub fn as_bytes(&self) -> &[u8] {
+        &self.0[..]
+    }
+
+    /// Returns the `BlockHash` as a ref.
+    pub fn as_ref(&self) -> &[u8] {
         &self.0[..]
     }
 }

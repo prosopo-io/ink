@@ -37,6 +37,7 @@ pub use self::{
     },
     types::{
         AccountId,
+        BlockHash,
         Clear,
         Hash,
     },

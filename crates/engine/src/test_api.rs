@@ -22,7 +22,6 @@ use crate::{
     AccountError,
     Error,
 };
-use ink_primitives::Hash;
 use std::collections::HashMap;
 
 /// Record for an emitted event.

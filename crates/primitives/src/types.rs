@@ -125,6 +125,50 @@ impl AsMut<[u8]> for Hash {
     }
 }
 
+/// The default environment `BlockHash` type.
+///
+/// # Note
+///
+/// This is a mirror of the `BlockHash` type used in the default configuration
+/// of PALLET contracts.
+#[derive(
+    Debug,
+    Copy,
+    Clone,
+    PartialEq,
+    Eq,
+    Ord,
+    PartialOrd,
+    Hash,
+    Encode,
+    Decode,
+    From,
+    Default,
+)]
+#[cfg_attr(feature = "std", derive(TypeInfo))]
+pub struct BlockHash([u8; 32]);
+
+impl<'a> TryFrom<&'a [u8]> for BlockHash {
+    type Error = TryFromSliceError;
+
+    fn try_from(bytes: &'a [u8]) -> Result<Self, TryFromSliceError> {
+        let hash = <[u8; 32]>::try_from(bytes)?;
+        Ok(Self(hash))
+    }
+}
+
+impl AsRef<[u8]> for BlockHash {
+    fn as_ref(&self) -> &[u8] {
+        &self.0[..]
+    }
+}
+
+impl AsMut<[u8]> for BlockHash {
+    fn as_mut(&mut self) -> &mut [u8] {
+        &mut self.0[..]
+    }
+}
+
 /// The equivalent of `Zero` for hashes.
 ///
 /// A hash that consists only of 0 bits is clear.

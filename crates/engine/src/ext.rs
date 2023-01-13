@@ -28,7 +28,6 @@ use crate::{
     types::{
         AccountId,
         Balance,
-        BlockHash,
         BlockTimestamp,
     },
 };
@@ -402,10 +401,10 @@ impl Engine {
         set_output(output, &block_timestamp[..])
     }
 
-    /// Returns the hash of the current block.
+    /// Returns the block_hash of the current block
     pub fn block_hash(&self, output: &mut &mut [u8]) {
-        let block_hash: Vec<u8> = scale::Encode::encode(&self.exec_context.block_hash);
-        set_output(output, &block_hash[..])
+        let block_hash = self.exec_context.block_hash.as_ref();
+        set_output(output, block_hash)
     }
 
     pub fn gas_left(&self, _output: &mut &mut [u8]) {

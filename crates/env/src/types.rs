@@ -34,6 +34,7 @@
 use super::arithmetic::AtLeast32BitUnsigned;
 use ink_primitives::{
     AccountId,
+    BlockHash,
     Clear,
     Hash,
 };
@@ -157,14 +158,13 @@ pub trait Environment {
     /// The type of block hash.
     type BlockHash: 'static
         + scale::Codec
-        + Copy
         + Clone
-        + Clear
         + PartialEq
         + Eq
         + Ord
         + AsRef<[u8]>
-        + AsMut<[u8]>;
+        + AsMut<[u8]>
+        + Default;
 
     /// The chain extension for the environment.
     ///
@@ -206,6 +206,3 @@ pub type Gas = u64;
 
 /// The default block number type.
 pub type BlockNumber = u32;
-
-/// The default block hash type.
-pub type BlockHash = [u8; 32];
