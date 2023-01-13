@@ -135,6 +135,7 @@ pub struct ChainSpec {
     pub minimum_balance: Balance,
     /// The targeted block time.
     pub block_time: BlockTimestamp,
+
 }
 
 /// The default values for the chain specification are:
