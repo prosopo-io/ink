@@ -17,6 +17,7 @@ use crate::{
     types::{
         AccountId,
         Balance,
+        BlockHash,
     },
     AccountError,
     Error,
@@ -225,7 +226,7 @@ impl Engine {
     pub fn advance_block(&mut self) {
         self.exec_context.block_number += 1;
         self.exec_context.block_timestamp += self.chain_spec.block_time;
-        self.exec_context.block_hash = Hash::default();
+        self.exec_context.block_hash = BlockHash::default();
     }
 
     /// Returns the callee, i.e. the currently executing contract.

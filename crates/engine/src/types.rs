@@ -24,7 +24,7 @@ pub type BlockNumber = u32;
 pub type BlockTimestamp = u64;
 
 /// Same type as the `DefaultEnvironment::Hash` type.
-pub type Hash = [u8; 32];
+pub type BlockHash = [u8; 32];
 
 /// Same type as the `DefaultEnvironment::Balance` type.
 pub type Balance = u128;

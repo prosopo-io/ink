@@ -14,10 +14,10 @@
 use super::types::{
     AccountId,
     Balance,
+    BlockHash,
     BlockNumber,
     BlockTimestamp,
 };
-use ink_primitives::Hash;
 
 /// The context of a contract execution.
 #[cfg_attr(test, derive(Debug, PartialEq, Eq))]
@@ -44,7 +44,7 @@ pub struct ExecContext {
     /// The current block timestamp.
     pub block_timestamp: BlockTimestamp,
     /// The current block hash.
-    pub block_hash: Hash,
+    pub block_hash: BlockHash,
 }
 
 impl ExecContext {

@@ -7,7 +7,7 @@ mod contract {
         hash: Hash,
         timestamp: Timestamp,
         block_number: BlockNumber,
-        block_hash: Hash,
+        block_hash: BlockHash,
     }
 
     impl Contract {

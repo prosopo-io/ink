@@ -293,10 +293,7 @@ where
     /// The Substrate default for the hash type is ...
     ///
     /// For more details visit: [`ink_env::block_hash`]
-    pub fn block_hash(self) -> E::Hash
-    where
-        <E as Environment>::Hash: Default,
-    {
+    pub fn block_hash(self) -> E::Hash {
         ink_env::block_hash::<E>()
     }
 

@@ -28,8 +28,8 @@ use crate::{
     types::{
         AccountId,
         Balance,
+        BlockHash,
         BlockTimestamp,
-        Hash,
     },
 };
 use scale::Encode;
