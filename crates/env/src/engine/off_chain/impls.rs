@@ -398,7 +398,7 @@ impl TypedEnvBackend for EnvInstance {
             })
     }
 
-    fn block_hash<E: Environment>(&mut self) -> E::Hash {
+    fn block_hash<E: Environment>(&mut self) -> E::Hash where <E as Environment>::Hash: Default {
         self.get_property::<E::Hash>(Engine::block_hash)
             .unwrap_or_else(|error| {
                 panic!("could not read `block_hash` property: {:?}", error)
