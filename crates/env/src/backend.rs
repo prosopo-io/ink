@@ -372,7 +372,7 @@ pub trait TypedEnvBackend: EnvBackend {
     /// # Note
     ///
     /// For more details visit: [`block_hash`][`crate::block_hash`]
-    fn block_hash<E: Environment>(&mut self) -> E::Hash;
+    fn block_hash<E: Environment>(&mut self) -> E::Hash where <E as Environment>::Hash: Default;
 
     /// Returns the address of the executed contract.
     ///

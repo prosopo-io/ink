@@ -295,7 +295,7 @@ where
     /// defined by the chain environment on which this contract runs.
     ///
     /// For more details visit: [`ink_env::block_hash`]
-    pub fn block_hash(self) -> E::Hash {
+    pub fn block_hash(self) -> E::Hash where <E as Environment>::Hash: Default {
         ink_env::block_hash::<E>()
     }
 
@@ -304,7 +304,7 @@ where
     /// # Example
     ///
     /// ```
-    /// 
+    ///
     /// #[ink::contract]
     /// pub mod only_owner {
     ///     #[ink(storage)]
@@ -382,7 +382,7 @@ where
     /// # Example
     ///
     /// ```
-    /// 
+    ///
     /// #[ink::contract]
     /// pub mod my_contract {
     ///     #[ink(storage)]
