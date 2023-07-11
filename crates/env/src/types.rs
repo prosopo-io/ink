@@ -32,14 +32,10 @@
 //! the trait bounds on the `Environment` trait types.
 
 use super::arithmetic::AtLeast32BitUnsigned;
-use core::{
-    array::TryFromSliceError,
-    convert::TryFrom,
-};
-use derive_more::From;
-use scale::{
-    Decode,
-    Encode,
+use ink_primitives::{
+    AccountId,
+    Clear,
+    Hash,
 };
 #[cfg(feature = "std")]
 use scale_info::TypeInfo;
@@ -58,7 +54,7 @@ impl FromLittleEndian for u8 {
 
     #[inline]
     fn from_le_bytes(bytes: Self::Bytes) -> Self {
-        Self::from_le_bytes(bytes)
+        u8::from_le_bytes(bytes)
     }
 }
 
@@ -67,7 +63,7 @@ impl FromLittleEndian for u16 {
 
     #[inline]
     fn from_le_bytes(bytes: Self::Bytes) -> Self {
-        Self::from_le_bytes(bytes)
+        u16::from_le_bytes(bytes)
     }
 }
 
@@ -76,7 +72,7 @@ impl FromLittleEndian for u32 {
 
     #[inline]
     fn from_le_bytes(bytes: Self::Bytes) -> Self {
-        Self::from_le_bytes(bytes)
+        u32::from_le_bytes(bytes)
     }
 }
 
@@ -85,7 +81,7 @@ impl FromLittleEndian for u64 {
 
     #[inline]
     fn from_le_bytes(bytes: Self::Bytes) -> Self {
-        Self::from_le_bytes(bytes)
+        u64::from_le_bytes(bytes)
     }
 }
 
@@ -94,7 +90,29 @@ impl FromLittleEndian for u128 {
 
     #[inline]
     fn from_le_bytes(bytes: Self::Bytes) -> Self {
-        Self::from_le_bytes(bytes)
+        u128::from_le_bytes(bytes)
+    }
+}
+
+/// A trait to enforce that a type should be an [`Environment::AccountId`].
+///
+/// If you have an [`Environment`] which uses an [`Environment::AccountId`] type other
+/// than the ink! provided [`AccountId`](https://docs.rs/ink_primitives/latest/ink_primitives/struct.AccountId.html)
+/// you will need to implement this trait for your [`Environment::AccountId`] concrete
+/// type.
+pub trait AccountIdGuard {}
+
+/// The ink! provided [`AccountId`](https://docs.rs/ink_primitives/latest/ink_primitives/struct.AccountId.html)
+/// used in the [`DefaultEnvironment`].
+impl AccountIdGuard for AccountId {}
+
+cfg_if::cfg_if! {
+    if #[cfg(feature = "std")] {
+        pub trait CodecAsType: scale_decode::DecodeAsType + scale_encode::EncodeAsType {}
+        impl<T: scale_decode::DecodeAsType + scale_encode::EncodeAsType> CodecAsType for T {}
+    } else {
+        pub trait CodecAsType {}
+        impl<T> CodecAsType for T {}
     }
 }
 
@@ -102,23 +120,25 @@ impl FromLittleEndian for u128 {
 pub trait Environment {
     /// The maximum number of supported event topics provided by the runtime.
     ///
-    /// The value must match the maximum number of supported event topics of the used runtime.
+    /// The value must match the maximum number of supported event topics of the used
+    /// runtime.
     const MAX_EVENT_TOPICS: usize;
 
-    /// The address type.
+    /// The account id type.
     type AccountId: 'static
         + scale::Codec
+        + CodecAsType
         + Clone
         + PartialEq
         + Eq
         + Ord
         + AsRef<[u8]>
-        + AsMut<[u8]>
-        + Default;
+        + AsMut<[u8]>;
 
     /// The type of balances.
     type Balance: 'static
         + scale::Codec
+        + CodecAsType
         + Copy
         + Clone
         + PartialEq
@@ -129,6 +149,7 @@ pub trait Environment {
     /// The type of hash.
     type Hash: 'static
         + scale::Codec
+        + CodecAsType
         + Copy
         + Clone
         + Clear
@@ -141,6 +162,7 @@ pub trait Environment {
     /// The type of a timestamp.
     type Timestamp: 'static
         + scale::Codec
+        + CodecAsType
         + Copy
         + Clone
         + PartialEq
@@ -151,6 +173,7 @@ pub trait Environment {
     /// The type of block number.
     type BlockNumber: 'static
         + scale::Codec
+        + CodecAsType
         + Copy
         + Clone
         + PartialEq
@@ -160,14 +183,16 @@ pub trait Environment {
 
     /// The chain extension for the environment.
     ///
-    /// This is a type that is defined through the `#[ink::chain_extension]` procedural macro.
-    /// For more information about usage and definition click [this][chain_extension] link.
+    /// This is a type that is defined through the `#[ink::chain_extension]` procedural
+    /// macro. For more information about usage and definition click
+    /// [this][chain_extension] link.
     ///
-    /// [chain_extension]: https://paritytech.github.io/ink/ink_lang/attr.chain_extension.html
+    /// [chain_extension]: https://paritytech.github.io/ink/ink/attr.chain_extension.html
     type ChainExtension;
 }
 
 /// Placeholder for chains that have no defined chain extension.
+#[cfg_attr(feature = "std", derive(TypeInfo))]
 pub enum NoChainExtension {}
 
 /// The fundamental types of the default configuration.
@@ -192,140 +217,8 @@ pub type Balance = u128;
 /// The default timestamp type.
 pub type Timestamp = u64;
 
+/// The default gas type.
+pub type Gas = u64;
+
 /// The default block number type.
 pub type BlockNumber = u32;
-
-/// The default environment `AccountId` type.
-///
-/// # Note
-///
-/// This is a mirror of the `AccountId` type used in the default configuration
-/// of PALLET contracts.
-#[derive(
-    Debug,
-    Copy,
-    Clone,
-    PartialEq,
-    Eq,
-    Ord,
-    PartialOrd,
-    Hash,
-    Encode,
-    Decode,
-    From,
-    Default,
-)]
-#[cfg_attr(feature = "std", derive(TypeInfo))]
-pub struct AccountId([u8; 32]);
-
-impl AsRef<[u8; 32]> for AccountId {
-    #[inline]
-    fn as_ref(&self) -> &[u8; 32] {
-        &self.0
-    }
-}
-
-impl AsMut<[u8; 32]> for AccountId {
-    #[inline]
-    fn as_mut(&mut self) -> &mut [u8; 32] {
-        &mut self.0
-    }
-}
-
-impl AsRef<[u8]> for AccountId {
-    #[inline]
-    fn as_ref(&self) -> &[u8] {
-        &self.0[..]
-    }
-}
-
-impl AsMut<[u8]> for AccountId {
-    #[inline]
-    fn as_mut(&mut self) -> &mut [u8] {
-        &mut self.0[..]
-    }
-}
-
-impl<'a> TryFrom<&'a [u8]> for AccountId {
-    type Error = TryFromSliceError;
-
-    fn try_from(bytes: &'a [u8]) -> Result<Self, TryFromSliceError> {
-        let address = <[u8; 32]>::try_from(bytes)?;
-        Ok(Self(address))
-    }
-}
-
-/// The default environment `Hash` type.
-///
-/// # Note
-///
-/// This is a mirror of the `Hash` type used in the default configuration
-/// of PALLET contracts.
-#[derive(
-    Debug,
-    Copy,
-    Clone,
-    PartialEq,
-    Eq,
-    Ord,
-    PartialOrd,
-    Hash,
-    Encode,
-    Decode,
-    From,
-    Default,
-)]
-#[cfg_attr(feature = "std", derive(TypeInfo))]
-pub struct Hash([u8; 32]);
-
-impl<'a> TryFrom<&'a [u8]> for Hash {
-    type Error = TryFromSliceError;
-
-    fn try_from(bytes: &'a [u8]) -> Result<Self, TryFromSliceError> {
-        let address = <[u8; 32]>::try_from(bytes)?;
-        Ok(Self(address))
-    }
-}
-
-impl AsRef<[u8]> for Hash {
-    fn as_ref(&self) -> &[u8] {
-        &self.0[..]
-    }
-}
-
-impl AsMut<[u8]> for Hash {
-    fn as_mut(&mut self) -> &mut [u8] {
-        &mut self.0[..]
-    }
-}
-
-/// The equivalent of `Zero` for hashes.
-///
-/// A hash that consists only of 0 bits is clear.
-pub trait Clear {
-    /// Returns `true` if the hash is clear.
-    fn is_clear(&self) -> bool;
-
-    /// Returns a clear hash.
-    fn clear() -> Self;
-}
-
-impl Clear for [u8; 32] {
-    fn is_clear(&self) -> bool {
-        self.as_ref().iter().all(|&byte| byte == 0x00)
-    }
-
-    fn clear() -> Self {
-        [0x00; 32]
-    }
-}
-
-impl Clear for Hash {
-    fn is_clear(&self) -> bool {
-        <[u8; 32] as Clear>::is_clear(&self.0)
-    }
-
-    fn clear() -> Self {
-        Self(<[u8; 32] as Clear>::clear())
-    }
-}

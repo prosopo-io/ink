@@ -69,7 +69,7 @@ fn setting_getting_balance() {
 
     // then
     let output = <u128 as scale::Decode>::decode(&mut &output[..16])
-        .expect("decoding balance failed");
+        .unwrap_or_else(|err| panic!("decoding balance failed: {err}"));
     assert_eq!(output, balance);
 }
 
@@ -271,4 +271,40 @@ fn ecdsa_recovery_with_secp256k1_crate() {
 
     // then
     assert_eq!(output, pubkey.serialize());
+}
+
+#[test]
+fn setting_getting_block_timestamp() {
+    // given
+    let mut engine = Engine::new();
+    let new_block_timestamp: u64 = 1000;
+    let output = &mut &mut get_buffer()[..];
+
+    // when
+    engine.advance_block();
+    engine.set_block_timestamp(new_block_timestamp);
+    engine.block_timestamp(output);
+
+    // then
+    let output = <u64 as scale::Decode>::decode(&mut &output[..16])
+        .expect("decoding value transferred failed");
+    assert_eq!(output, new_block_timestamp);
+}
+
+#[test]
+fn setting_getting_block_number() {
+    // given
+    let mut engine = Engine::new();
+    let new_block_number: u32 = 1000;
+    let output = &mut &mut get_buffer()[..];
+
+    // when
+    engine.advance_block();
+    engine.set_block_number(new_block_number);
+    engine.block_number(output);
+
+    // then
+    let output = <u32 as scale::Decode>::decode(&mut &output[..16])
+        .expect("decoding value transferred failed");
+    assert_eq!(output, new_block_number);
 }

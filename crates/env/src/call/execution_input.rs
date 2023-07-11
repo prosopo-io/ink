@@ -15,7 +15,7 @@
 use crate::call::Selector;
 
 /// The input data for a smart contract execution.
-#[derive(Default, Debug)]
+#[derive(Clone, Default, Debug)]
 pub struct ExecutionInput<Args> {
     /// The selector for the smart contract execution.
     selector: Selector,
@@ -49,7 +49,7 @@ impl ExecutionInput<EmptyArgumentList> {
     }
 }
 
-impl<'a, Head, Rest> ExecutionInput<ArgumentList<Argument<Head>, Rest>> {
+impl<Head, Rest> ExecutionInput<ArgumentList<Argument<Head>, Rest>> {
     /// Pushes an argument to the execution input.
     #[inline]
     pub fn push_arg<T>(self, arg: T) -> ExecutionInput<ArgsList<T, ArgsList<Head, Rest>>>
@@ -63,6 +63,16 @@ impl<'a, Head, Rest> ExecutionInput<ArgumentList<Argument<Head>, Rest>> {
     }
 }
 
+impl<Args> ExecutionInput<Args> {
+    /// Modify the selector.
+    ///
+    /// Useful when using the [`ExecutionInput`] generated as part of the
+    /// `ContractRef`, but using a custom selector.
+    pub fn update_selector(&mut self, selector: Selector) {
+        self.selector = selector;
+    }
+}
+
 /// An argument list.
 ///
 /// This type is constructed mainly at compile type via type constructions
@@ -70,7 +80,7 @@ impl<'a, Head, Rest> ExecutionInput<ArgumentList<Argument<Head>, Rest>> {
 /// arguments. The potentially heap allocating encoding is done right at the end
 /// where we can leverage the static environmental buffer instead of allocating
 /// heap memory.
-#[derive(Default, Debug)]
+#[derive(Clone, Default, Debug)]
 pub struct ArgumentList<Head, Rest> {
     /// The first argument of the argument list.
     head: Head,
@@ -82,7 +92,7 @@ pub struct ArgumentList<Head, Rest> {
 pub type ArgsList<Head, Rest> = ArgumentList<Argument<Head>, Rest>;
 
 /// A single argument and its reference to a known value.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Argument<T> {
     /// The reference to the known value.
     ///
@@ -99,7 +109,7 @@ impl<T> Argument<T> {
 }
 
 /// The end of an argument list.
-#[derive(Default, Debug)]
+#[derive(Clone, Default, Debug)]
 pub struct ArgumentListEnd;
 
 /// An empty argument list.
@@ -167,7 +177,7 @@ impl scale::Encode for EmptyArgumentList {
     fn encode_to<O: scale::Output + ?Sized>(&self, _output: &mut O) {}
 }
 
-impl<'a, Head, Rest> scale::Encode for ArgumentList<Argument<Head>, Rest>
+impl<Head, Rest> scale::Encode for ArgumentList<Argument<Head>, Rest>
 where
     Head: scale::Encode,
     Rest: scale::Encode,

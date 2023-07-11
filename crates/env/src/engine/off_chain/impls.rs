@@ -15,9 +15,12 @@
 use super::EnvInstance;
 use crate::{
     call::{
-        utils::ReturnType,
+        Call,
         CallParams,
+        ConstructorReturnType,
         CreateParams,
+        DelegateCall,
+        FromAccountId,
     },
     hash::{
         Blake2x128,
@@ -43,7 +46,7 @@ use ink_engine::{
     ext,
     ext::Engine,
 };
-use ink_primitives::Key;
+use ink_storage_traits::Storable;
 
 /// The capacity of the static buffer.
 /// This is the same size as the ink! on-chain environment. We chose to use the same size
@@ -135,7 +138,7 @@ where
     {
         let encoded = topic_value.encode();
         let len_encoded = encoded.len();
-        let mut result = <E as Environment>::Hash::clear();
+        let mut result = <E as Environment>::Hash::CLEAR_HASH;
         let len_result = result.as_ref().len();
         if len_encoded <= len_result {
             result.as_mut()[..len_encoded].copy_from_slice(&encoded[..]);
@@ -183,44 +186,75 @@ impl EnvInstance {
 }
 
 impl EnvBackend for EnvInstance {
-    fn set_contract_storage<V>(&mut self, key: &Key, value: &V)
+    fn set_contract_storage<K, V>(&mut self, key: &K, value: &V) -> Option<u32>
     where
-        V: scale::Encode,
+        K: scale::Encode,
+        V: Storable,
     {
-        let v = scale::Encode::encode(value);
-        self.engine.set_storage(key.as_ref(), &v[..]);
+        let mut v = vec![];
+        Storable::encode(value, &mut v);
+        self.engine.set_storage(&key.encode(), &v[..])
     }
 
-    fn get_contract_storage<R>(&mut self, key: &Key) -> Result<Option<R>>
+    fn get_contract_storage<K, R>(&mut self, key: &K) -> Result<Option<R>>
     where
-        R: scale::Decode,
+        K: scale::Encode,
+        R: Storable,
     {
         let mut output: [u8; 9600] = [0; 9600];
-        match self.engine.get_storage(key.as_ref(), &mut &mut output[..]) {
+        match self.engine.get_storage(&key.encode(), &mut &mut output[..]) {
             Ok(_) => (),
             Err(ext::Error::KeyNotFound) => return Ok(None),
             Err(_) => panic!("encountered unexpected error"),
         }
-        let decoded = scale::Decode::decode(&mut &output[..])?;
+        let decoded = Storable::decode(&mut &output[..])?;
         Ok(Some(decoded))
     }
 
-    fn clear_contract_storage(&mut self, key: &Key) {
-        self.engine.clear_storage(key.as_ref())
+    fn take_contract_storage<K, R>(&mut self, key: &K) -> Result<Option<R>>
+    where
+        K: scale::Encode,
+        R: Storable,
+    {
+        let mut output: [u8; 9600] = [0; 9600];
+        match self
+            .engine
+            .take_storage(&key.encode(), &mut &mut output[..])
+        {
+            Ok(_) => (),
+            Err(ext::Error::KeyNotFound) => return Ok(None),
+            Err(_) => panic!("encountered unexpected error"),
+        }
+        let decoded = Storable::decode(&mut &output[..])?;
+        Ok(Some(decoded))
+    }
+
+    fn contains_contract_storage<K>(&mut self, key: &K) -> Option<u32>
+    where
+        K: scale::Encode,
+    {
+        self.engine.contains_storage(&key.encode())
+    }
+
+    fn clear_contract_storage<K>(&mut self, key: &K) -> Option<u32>
+    where
+        K: scale::Encode,
+    {
+        self.engine.clear_storage(&key.encode())
     }
 
     fn decode_input<T>(&mut self) -> Result<T>
     where
         T: scale::Decode,
     {
-        unimplemented!("the off-chain env does not implement `seal_input`")
+        unimplemented!("the off-chain env does not implement `input`")
     }
 
     fn return_value<R>(&mut self, _flags: ReturnFlags, _return_value: &R) -> !
     where
         R: scale::Encode,
     {
-        unimplemented!("the off-chain env does not implement `seal_return_value`")
+        unimplemented!("the off-chain env does not implement `return_value`")
     }
 
     fn debug_message(&mut self, message: &str) {
@@ -259,22 +293,21 @@ impl EnvBackend for EnvInstance {
         };
 
         // In most implementations, the v is just 0 or 1 internally, but 27 was added
-        // as an arbitrary number for signing Bitcoin messages and Ethereum adopted that as well.
+        // as an arbitrary number for signing Bitcoin messages and Ethereum adopted that
+        // as well.
         let recovery_byte = if signature[64] > 26 {
             signature[64] - 27
         } else {
             signature[64]
         };
         let recovery_id = RecoveryId::from_i32(recovery_byte as i32)
-            .unwrap_or_else(|error| panic!("Unable to parse the recovery id: {}", error));
+            .unwrap_or_else(|error| panic!("Unable to parse the recovery id: {error}"));
         let message = Message::from_slice(message_hash).unwrap_or_else(|error| {
-            panic!("Unable to create the message from hash: {}", error)
+            panic!("Unable to create the message from hash: {error}")
         });
         let signature =
             RecoverableSignature::from_compact(&signature[0..64], recovery_id)
-                .unwrap_or_else(|error| {
-                    panic!("Unable to parse the signature: {}", error)
-                });
+                .unwrap_or_else(|error| panic!("Unable to parse the signature: {error}"));
 
         let pub_key = SECP256K1.recover_ecdsa(&message, &signature);
         match pub_key {
@@ -284,6 +317,20 @@ impl EnvBackend for EnvInstance {
             }
             Err(_) => Err(Error::EcdsaRecoveryFailed),
         }
+    }
+
+    fn ecdsa_to_eth_address(
+        &mut self,
+        pubkey: &[u8; 33],
+        output: &mut [u8; 20],
+    ) -> Result<()> {
+        let pk = secp256k1::PublicKey::from_slice(pubkey)
+            .map_err(|_| Error::EcdsaRecoveryFailed)?;
+        let uncompressed = pk.serialize_uncompressed();
+        let mut hash = <Keccak256 as HashOutput>::Type::default();
+        <Keccak256>::hash(&uncompressed[1..], &mut hash);
+        output.as_mut().copy_from_slice(&hash[12..]);
+        Ok(())
     }
 
     fn call_chain_extension<I, T, E, ErrorCode, F, D>(
@@ -307,90 +354,93 @@ impl EnvBackend for EnvInstance {
             .call_chain_extension(func_id, enc_input, &mut &mut output[..]);
         let (status, out): (u32, Vec<u8>) = scale::Decode::decode(&mut &output[..])
             .unwrap_or_else(|error| {
-                panic!(
-                    "could not decode `call_chain_extension` output: {:?}",
-                    error
-                )
+                panic!("could not decode `call_chain_extension` output: {error:?}")
             });
 
         status_to_result(status)?;
         let decoded = decode_to_result(&out[..])?;
         Ok(decoded)
     }
+
+    fn set_code_hash(&mut self, _code_hash: &[u8]) -> Result<()> {
+        unimplemented!("off-chain environment does not support `set_code_hash`")
+    }
 }
 
 impl TypedEnvBackend for EnvInstance {
-    fn caller<T: Environment>(&mut self) -> T::AccountId {
-        self.get_property::<T::AccountId>(Engine::caller)
+    fn caller<E: Environment>(&mut self) -> E::AccountId {
+        self.get_property::<E::AccountId>(Engine::caller)
+            .unwrap_or_else(|error| panic!("could not read `caller` property: {error:?}"))
+    }
+
+    fn transferred_value<E: Environment>(&mut self) -> E::Balance {
+        self.get_property::<E::Balance>(Engine::value_transferred)
             .unwrap_or_else(|error| {
-                panic!("could not read `caller` property: {:?}", error)
+                panic!("could not read `transferred_value` property: {error:?}")
             })
     }
 
-    fn transferred_value<T: Environment>(&mut self) -> T::Balance {
-        self.get_property::<T::Balance>(Engine::value_transferred)
-            .unwrap_or_else(|error| {
-                panic!("could not read `transferred_value` property: {:?}", error)
-            })
-    }
-
-    fn gas_left<T: Environment>(&mut self) -> u64 {
+    fn gas_left<E: Environment>(&mut self) -> u64 {
         self.get_property::<u64>(Engine::gas_left)
             .unwrap_or_else(|error| {
-                panic!("could not read `gas_left` property: {:?}", error)
+                panic!("could not read `gas_left` property: {error:?}")
             })
     }
 
-    fn block_timestamp<T: Environment>(&mut self) -> T::Timestamp {
-        self.get_property::<T::Timestamp>(Engine::block_timestamp)
+    fn block_timestamp<E: Environment>(&mut self) -> E::Timestamp {
+        self.get_property::<E::Timestamp>(Engine::block_timestamp)
             .unwrap_or_else(|error| {
-                panic!("could not read `block_timestamp` property: {:?}", error)
+                panic!("could not read `block_timestamp` property: {error:?}")
             })
     }
 
-    fn account_id<T: Environment>(&mut self) -> T::AccountId {
-        self.get_property::<T::AccountId>(Engine::address)
+    fn account_id<E: Environment>(&mut self) -> E::AccountId {
+        self.get_property::<E::AccountId>(Engine::address)
             .unwrap_or_else(|error| {
-                panic!("could not read `account_id` property: {:?}", error)
+                panic!("could not read `account_id` property: {error:?}")
             })
     }
 
-    fn balance<T: Environment>(&mut self) -> T::Balance {
-        self.get_property::<T::Balance>(Engine::balance)
+    fn balance<E: Environment>(&mut self) -> E::Balance {
+        self.get_property::<E::Balance>(Engine::balance)
             .unwrap_or_else(|error| {
-                panic!("could not read `balance` property: {:?}", error)
+                panic!("could not read `balance` property: {error:?}")
             })
     }
 
-    fn block_number<T: Environment>(&mut self) -> T::BlockNumber {
-        self.get_property::<T::BlockNumber>(Engine::block_number)
+    fn block_number<E: Environment>(&mut self) -> E::BlockNumber {
+        self.get_property::<E::BlockNumber>(Engine::block_number)
             .unwrap_or_else(|error| {
-                panic!("could not read `block_number` property: {:?}", error)
+                panic!("could not read `block_number` property: {error:?}")
             })
     }
 
-    fn minimum_balance<T: Environment>(&mut self) -> T::Balance {
-        self.get_property::<T::Balance>(Engine::minimum_balance)
+    fn minimum_balance<E: Environment>(&mut self) -> E::Balance {
+        self.get_property::<E::Balance>(Engine::minimum_balance)
             .unwrap_or_else(|error| {
-                panic!("could not read `minimum_balance` property: {:?}", error)
+                panic!("could not read `minimum_balance` property: {error:?}")
             })
     }
 
-    fn emit_event<T, Event>(&mut self, event: Event)
+    fn emit_event<E, Event>(&mut self, event: Event)
     where
-        T: Environment,
+        E: Environment,
         Event: Topics + scale::Encode,
     {
         let builder = TopicsBuilder::default();
-        let enc_topics = event.topics::<T, _>(builder.into());
+        let enc_topics = event.topics::<E, _>(builder.into());
         let enc_data = &scale::Encode::encode(&event)[..];
         self.engine.deposit_event(&enc_topics[..], enc_data);
     }
 
-    fn invoke_contract<T, Args>(&mut self, params: &CallParams<T, Args, ()>) -> Result<()>
+    fn invoke_contract<E, Args, R>(
+        &mut self,
+        params: &CallParams<E, Call<E>, Args, R>,
+    ) -> Result<ink_primitives::MessageResult<R>>
     where
-        T: Environment,
+        E: Environment,
         Args: scale::Encode,
+        R: scale::Decode,
     {
         let _gas_limit = params.gas_limit();
         let _callee = params.callee();
@@ -400,26 +450,35 @@ impl TypedEnvBackend for EnvInstance {
         unimplemented!("off-chain environment does not support contract invocation")
     }
 
-    fn eval_contract<T, Args, R>(
+    fn invoke_contract_delegate<E, Args, R>(
         &mut self,
-        _call_params: &CallParams<T, Args, ReturnType<R>>,
-    ) -> Result<R>
+        params: &CallParams<E, DelegateCall<E>, Args, R>,
+    ) -> Result<ink_primitives::MessageResult<R>>
     where
-        T: Environment,
+        E: Environment,
         Args: scale::Encode,
         R: scale::Decode,
     {
-        unimplemented!("off-chain environment does not support contract evaluation")
+        let _code_hash = params.code_hash();
+        unimplemented!(
+            "off-chain environment does not support delegated contract invocation"
+        )
     }
 
-    fn instantiate_contract<T, Args, Salt, C>(
+    fn instantiate_contract<E, ContractRef, Args, Salt, R>(
         &mut self,
-        params: &CreateParams<T, Args, Salt, C>,
-    ) -> Result<T::AccountId>
+        params: &CreateParams<E, ContractRef, Args, Salt, R>,
+    ) -> Result<
+        ink_primitives::ConstructorResult<
+            <R as ConstructorReturnType<ContractRef>>::Output,
+        >,
+    >
     where
-        T: Environment,
+        E: Environment,
+        ContractRef: FromAccountId<E>,
         Args: scale::Encode,
         Salt: AsRef<[u8]>,
+        R: ConstructorReturnType<ContractRef>,
     {
         let _code_hash = params.code_hash();
         let _gas_limit = params.gas_limit();
@@ -429,17 +488,17 @@ impl TypedEnvBackend for EnvInstance {
         unimplemented!("off-chain environment does not support contract instantiation")
     }
 
-    fn terminate_contract<T>(&mut self, beneficiary: T::AccountId) -> !
+    fn terminate_contract<E>(&mut self, beneficiary: E::AccountId) -> !
     where
-        T: Environment,
+        E: Environment,
     {
         let buffer = scale::Encode::encode(&beneficiary);
         self.engine.terminate(&buffer[..])
     }
 
-    fn transfer<T>(&mut self, destination: T::AccountId, value: T::Balance) -> Result<()>
+    fn transfer<E>(&mut self, destination: E::AccountId, value: E::Balance) -> Result<()>
     where
-        T: Environment,
+        E: Environment,
     {
         let enc_destination = &scale::Encode::encode(&destination)[..];
         let enc_value = &scale::Encode::encode(&value)[..];
@@ -448,34 +507,46 @@ impl TypedEnvBackend for EnvInstance {
             .map_err(Into::into)
     }
 
-    fn weight_to_fee<T: Environment>(&mut self, gas: u64) -> T::Balance {
+    fn weight_to_fee<E: Environment>(&mut self, gas: u64) -> E::Balance {
         let mut output: [u8; BUFFER_SIZE] = [0; BUFFER_SIZE];
         self.engine.weight_to_fee(gas, &mut &mut output[..]);
         scale::Decode::decode(&mut &output[..]).unwrap_or_else(|error| {
-            panic!("could not read `weight_to_fee` property: {:?}", error)
+            panic!("could not read `weight_to_fee` property: {error:?}")
         })
     }
 
-    fn random<T>(&mut self, subject: &[u8]) -> Result<(T::Hash, T::BlockNumber)>
+    fn is_contract<E>(&mut self, account: &E::AccountId) -> bool
     where
-        T: Environment,
+        E: Environment,
     {
-        let mut output: [u8; BUFFER_SIZE] = [0; BUFFER_SIZE];
-        self.engine.random(subject, &mut &mut output[..]);
-        scale::Decode::decode(&mut &output[..]).map_err(Into::into)
+        self.engine.is_contract(scale::Encode::encode(&account))
     }
 
-    fn is_contract<T>(&mut self, _account: &T::AccountId) -> bool
+    fn caller_is_origin<E>(&mut self) -> bool
     where
-        T: Environment,
-    {
-        unimplemented!("off-chain environment does not support contract instantiation")
-    }
-
-    fn caller_is_origin<T>(&mut self) -> bool
-    where
-        T: Environment,
+        E: Environment,
     {
         unimplemented!("off-chain environment does not support cross-contract calls")
+    }
+
+    fn code_hash<E>(&mut self, _account: &E::AccountId) -> Result<E::Hash>
+    where
+        E: Environment,
+    {
+        unimplemented!("off-chain environment does not support `code_hash`")
+    }
+
+    fn own_code_hash<E>(&mut self) -> Result<E::Hash>
+    where
+        E: Environment,
+    {
+        unimplemented!("off-chain environment does not support `own_code_hash`")
+    }
+
+    fn call_runtime<E, Call>(&mut self, _call: &Call) -> Result<()>
+    where
+        E: Environment,
+    {
+        unimplemented!("off-chain environment does not support `call_runtime`")
     }
 }

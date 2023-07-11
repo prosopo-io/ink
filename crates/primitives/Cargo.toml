@@ -1,6 +1,6 @@
 [package]
 name = "ink_primitives"
-version = "3.0.0-rc9"
+version = "4.2.0"
 authors = ["Parity Technologies <admin@parity.io>", "Robin Freyler <robin@parity.io>"]
 edition = "2021"
 
@@ -15,23 +15,20 @@ categories = ["no-std", "embedded"]
 include = ["/Cargo.toml", "src/**/*.rs", "/README.md", "/LICENSE"]
 
 [dependencies]
-ink_prelude = { version = "3.0.0-rc9", path = "../prelude/", default-features = false }
-scale = { package = "parity-scale-codec", version = "3", default-features = false, features = ["derive", "full"] }
-scale-info = { version = "2", default-features = false, features = ["derive"], optional = true }
-cfg-if = "1"
-
-[dev-dependencies]
-criterion = "0.3.1"
+derive_more = { version = "0.99", default-features = false, features = ["from", "display"] }
+ink_prelude = { version = "4.2.0", path = "../prelude/", default-features = false }
+scale = { package = "parity-scale-codec", version = "3.4", default-features = false, features = ["derive"] }
+scale-decode = { version = "0.7.0", default-features = false, features = ["derive"], optional = true }
+scale-encode = { version = "0.3.0", default-features = false, features = ["derive"], optional = true }
+scale-info = { version = "2.6", default-features = false, features = ["derive"], optional = true }
+xxhash-rust = { version = "0.8", features = ["const_xxh32"] }
 
 [features]
 default = ["std"]
 std = [
     "ink_prelude/std",
     "scale/std",
+    "scale-decode",
+    "scale-encode",
     "scale-info/std",
 ]
-
-[[bench]]
-name = "bench"
-path = "benches/bench.rs"
-harness = false

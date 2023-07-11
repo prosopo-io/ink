@@ -20,12 +20,22 @@
 //!
 //! The `ink_prelude` crate guarantees a stable interface between `std` and `no_std` mode.
 
+#![doc(
+    html_logo_url = "https://use.ink/img/crate-docs/logo.png",
+    html_favicon_url = "https://use.ink/crate-docs/favicon.png"
+)]
 #![cfg_attr(not(feature = "std"), no_std)]
 
 #[cfg(not(feature = "std"))]
 extern crate alloc;
 
 use cfg_if::cfg_if;
+
+/// A well know selector reserved for the message required to be defined
+/// alongside a wildcard selector. See [IIP-2](https://github.com/paritytech/ink/issues/1676).
+///
+/// Calculated from `selector_bytes!("IIP2_WILDCARD_COMPLEMENT")`
+pub const IIP2_WILDCARD_COMPLEMENT_SELECTOR: [u8; 4] = [0x9B, 0xAE, 0x9D, 0x5E];
 
 cfg_if! {
     if #[cfg(feature = "std")] {

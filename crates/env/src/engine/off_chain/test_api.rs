@@ -98,18 +98,6 @@ where
     })
 }
 
-/// Set the entropy hash of the current block.
-///
-/// # Note
-///
-/// This allows to control what [`random`][`crate::random`] returns.
-pub fn set_block_entropy<T>(_entropy: T::Hash) -> Result<()>
-where
-    T: Environment,
-{
-    unimplemented!("off-chain environment does not yet support `set_block_entropy`");
-}
-
 /// Returns the contents of the past performed environmental debug messages in order.
 pub fn recorded_debug_messages() -> RecordedDebugMessages {
     <EnvInstance as OnInstance>::on_instance(|instance| {
@@ -121,8 +109,9 @@ pub fn recorded_debug_messages() -> RecordedDebugMessages {
 ///
 /// # Note
 ///
-/// Useful for benchmarks because it ensures the initialized storage is maintained across runs,
-/// because lazy storage structures automatically clear their associated cells when they are dropped.
+/// Useful for benchmarks because it ensures the initialized storage is maintained across
+/// runs, because lazy storage structures automatically clear their associated cells when
+/// they are dropped.
 pub fn set_clear_storage_disabled(_disable: bool) {
     unimplemented!(
         "off-chain environment does not yet support `set_clear_storage_disabled`"
@@ -161,6 +150,32 @@ where
     })
 }
 
+/// Sets an account as a contract
+pub fn set_contract<T>(contract: T::AccountId)
+where
+    T: Environment,
+    <T as Environment>::AccountId: From<[u8; 32]>,
+{
+    <EnvInstance as OnInstance>::on_instance(|instance| {
+        instance
+            .engine
+            .set_contract(scale::Encode::encode(&contract));
+    })
+}
+
+/// Returns a boolean to indicate whether an account is a contract
+pub fn is_contract<T>(contract: T::AccountId) -> bool
+where
+    T: Environment,
+    <T as Environment>::AccountId: From<[u8; 32]>,
+{
+    <EnvInstance as OnInstance>::on_instance(|instance| {
+        instance
+            .engine
+            .is_contract(scale::Encode::encode(&contract))
+    })
+}
+
 /// Gets the currently set callee.
 ///
 /// This is account id of the currently executing contract.
@@ -170,7 +185,8 @@ where
 {
     <EnvInstance as OnInstance>::on_instance(|instance| {
         let callee = instance.engine.get_callee();
-        scale::Decode::decode(&mut &callee[..]).expect("encoding failed")
+        scale::Decode::decode(&mut &callee[..])
+            .unwrap_or_else(|err| panic!("encoding failed: {err}"))
     })
 }
 
@@ -186,20 +202,10 @@ where
     })
 }
 
-/// Sets the balance of `account_id` to `new_balance`.
-pub fn set_balance<T>(account_id: T::AccountId, new_balance: T::Balance)
-where
-    T: Environment<Balance = u128>, // Just temporary for the MVP!
-    <T as Environment>::AccountId: From<[u8; 32]>,
-{
-    <EnvInstance as OnInstance>::on_instance(|instance| {
-        instance
-            .engine
-            .set_balance(scale::Encode::encode(&account_id), new_balance);
-    })
-}
-
 /// Sets the value transferred from the caller to the callee as part of the call.
+///
+/// Please note that the acting accounts should be set with [`set_caller()`] and
+/// [`set_callee()`] beforehand.
 pub fn set_value_transferred<T>(value: T::Balance)
 where
     T: Environment<Balance = u128>, // Just temporary for the MVP!
@@ -207,6 +213,45 @@ where
     <EnvInstance as OnInstance>::on_instance(|instance| {
         instance.engine.set_value_transferred(value);
     })
+}
+
+/// Transfers value from the caller account to the contract.
+///
+/// Please note that the acting accounts should be set with [`set_caller()`] and
+/// [`set_callee()`] beforehand.
+pub fn transfer_in<T>(value: T::Balance)
+where
+    T: Environment<Balance = u128>, // Just temporary for the MVP!
+{
+    <EnvInstance as OnInstance>::on_instance(|instance| {
+        let caller = instance
+            .engine
+            .exec_context
+            .caller
+            .as_ref()
+            .expect("no caller has been set")
+            .as_bytes()
+            .to_vec();
+
+        let caller_old_balance = instance
+            .engine
+            .get_balance(caller.clone())
+            .unwrap_or_default();
+
+        let callee = instance.engine.get_callee();
+        let contract_old_balance = instance
+            .engine
+            .get_balance(callee.clone())
+            .unwrap_or_default();
+
+        instance
+            .engine
+            .set_balance(caller, caller_old_balance - value);
+        instance
+            .engine
+            .set_balance(callee, contract_old_balance + value);
+        instance.engine.set_value_transferred(value);
+    });
 }
 
 /// Returns the amount of storage cells used by the account `account_id`.
@@ -221,6 +266,26 @@ where
             .engine
             .count_used_storage_cells(&scale::Encode::encode(&account_id))
             .map_err(Into::into)
+    })
+}
+
+/// Sets the block timestamp for the next [`advance_block`] invocation.
+pub fn set_block_timestamp<T>(value: T::Timestamp)
+where
+    T: Environment<Timestamp = u64>,
+{
+    <EnvInstance as OnInstance>::on_instance(|instance| {
+        instance.engine.set_block_timestamp(value);
+    })
+}
+
+/// Sets the block number for the next [`advance_block`] invocation.
+pub fn set_block_number<T>(value: T::BlockNumber)
+where
+    T: Environment<BlockNumber = u32>,
+{
+    <EnvInstance as OnInstance>::on_instance(|instance| {
+        instance.engine.set_block_number(value);
     })
 }
 
@@ -305,7 +370,6 @@ pub fn recorded_events() -> impl Iterator<Item = EmittedEvent> {
         instance
             .engine
             .get_emitted_events()
-            .into_iter()
             .map(|evt: ink_engine::test_api::EmittedEvent| evt.into())
     })
 }
@@ -317,9 +381,9 @@ pub fn recorded_events() -> impl Iterator<Item = EmittedEvent> {
 ///
 /// * `should_terminate`: A closure in which the function supposed to terminate is called.
 /// * `expected_beneficiary`: The beneficiary account who should have received the
-///    remaining value in the contract
-/// * `expected_value_transferred_to_beneficiary`: The value which should have been transferred
-///   to the `expected_beneficiary`.
+///   remaining value in the contract
+/// * `expected_value_transferred_to_beneficiary`: The value which should have been
+///   transferred to the `expected_beneficiary`.
 /// # Usage
 ///
 /// ```no_compile
@@ -331,7 +395,7 @@ pub fn recorded_events() -> impl Iterator<Item = EmittedEvent> {
 /// );
 /// ```
 ///
-/// See `examples/contract-terminate` for a complete usage example.
+/// See `integration-tests/contract-terminate` for a complete usage example.
 pub fn assert_contract_termination<T, F>(
     should_terminate: F,
     expected_beneficiary: T::AccountId,
@@ -348,10 +412,21 @@ pub fn assert_contract_termination<T, F>(
         .downcast_ref::<Vec<u8>>()
         .expect("panic object can not be cast");
     let (value_transferred, encoded_beneficiary): (T::Balance, Vec<u8>) =
-        scale::Decode::decode(&mut &encoded_input[..]).expect("input can not be decoded");
+        scale::Decode::decode(&mut &encoded_input[..])
+            .unwrap_or_else(|err| panic!("input can not be decoded: {err}"));
     let beneficiary =
         <T::AccountId as scale::Decode>::decode(&mut &encoded_beneficiary[..])
-            .expect("input can not be decoded");
+            .unwrap_or_else(|err| panic!("input can not be decoded: {err}"));
     assert_eq!(value_transferred, expected_value_transferred_to_beneficiary);
     assert_eq!(beneficiary, expected_beneficiary);
+}
+
+/// Prepend contract message call with value transfer. Used for tests in off-chain
+/// environment.
+#[macro_export]
+macro_rules! pay_with_call {
+    ($contract:ident . $message:ident ( $( $params:expr ),* ) , $amount:expr) => {{
+        $crate::test::transfer_in::<Environment>($amount);
+        $contract.$message($ ($params) ,*)
+    }}
 }
